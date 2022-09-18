@@ -1,0 +1,44 @@
+---
+name: Publish
+
+on:
+  release:
+    types: [ published ]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: true
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          # Disabling shallow clone is required for Nerdbank.GitVersioning to work properly
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: |
+            3.1.x
+            6.0.x
+      - run: dotnet restore
+      - run: dotnet build -c Release --no-restore
+      - run: dotnet test -c Release --no-build --verbosity=minimal
+  nuget:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: true
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          # Disabling shallow clone is required for Nerdbank.GitVersioning to work properly
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: '6.0.x'
+      - run: dotnet pack -c Release
+      - name: Publish
+        run: |
+          dotnet nuget push src/*/bin/Release/*.nupkg --skip-duplicate \
+            --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+          dotnet nuget push src/*/bin/Release/*.snupkg --skip-duplicate \
+            --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
