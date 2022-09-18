@@ -29,6 +29,7 @@ internal static class ResiliencePolicy
     public static bool IsTransient(Exception exception) => exception switch
     {
         AmazonServiceException { Retryable: not null } awsException => true,
+        // TODO Handle Amazon.Runtime.Internal.HttpErrorResponseException
         _ => false,
     };
 }
