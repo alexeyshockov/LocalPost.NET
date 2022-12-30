@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net7</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.2" />
+        <PackageReference Include="AWSSDK.SecurityToken" Version="3.7.100.41" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\LocalPost\LocalPost.csproj" />
+        <ProjectReference Include="..\..\src\LocalPost.SnsPublisher\LocalPost.SnsPublisher.csproj" />
+        <ProjectReference Include="..\..\src\LocalPost.SqsConsumer\LocalPost.SqsConsumer.csproj" />
+    </ItemGroup>
+
+</Project>

@@ -21,7 +21,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\LocalPost\LocalPost.csproj" />
+        <ProjectReference Include="..\..\src\LocalPost.SnsPublisher\LocalPost.SnsPublisher.csproj" />
     </ItemGroup>
 
 </Project>

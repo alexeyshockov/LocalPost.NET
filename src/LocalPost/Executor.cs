@@ -1,59 +1,57 @@
+using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.Options;
+
 namespace LocalPost;
 
-public interface IExecutor
+internal interface IExecutor
 {
-    ValueTask Start(Func<Task> itemProcessor);
+    public bool IsEmpty { get; }
+
+    // Start only when there is a capacity
+    ValueTask StartAsync(Func<Task> itemProcessor, CancellationToken ct);
 
     // Wait for all active tasks to finish...
-    ValueTask WaitAsync(CancellationToken forceExitToken);
+    ValueTask WaitAsync(CancellationToken ct);
 }
 
 internal sealed class BoundedExecutor : IExecutor
 {
-    private readonly List<Task> _tasks;
+    private readonly ConcurrentTasksList _tasks;
 
-    public BoundedExecutor(int maxConcurrency = int.MaxValue)
+    [ExcludeFromCodeCoverage]
+    public BoundedExecutor(string name, IOptionsMonitor<QueueOptions> options) : this(options.Get(name).MaxConcurrency)
+    {
+    }
+
+    public BoundedExecutor(ushort maxConcurrency = ushort.MaxValue)
     {
         MaxConcurrency = maxConcurrency;
-        _tasks = new List<Task>(maxConcurrency);
+        _tasks = new ConcurrentTasksList(MaxConcurrency);
     }
 
-    public int MaxConcurrency { get; }
+    public ushort MaxConcurrency { get; }
 
-    // TODO Make it thread safe (lock?)
-    public async ValueTask Start(Func<Task> itemProcessor)
+    public bool IsEmpty => _tasks.Count == 0;
+
+    private async ValueTask WaitForCapacityAsync(CancellationToken ct)
     {
-        CleanupCompleted();
+        _tasks.CleanupCompleted();
+        while (_tasks.Count >= MaxConcurrency)
+            await _tasks.WaitForCompleted(ct);
+    }
+
+    public async ValueTask StartAsync(Func<Task> itemProcessor, CancellationToken ct)
+    {
         if (_tasks.Count >= MaxConcurrency)
-            _tasks.Remove(await Task.WhenAny(_tasks));
+            await WaitForCapacityAsync(ct);
 
-        _tasks.Add(itemProcessor());
+        _tasks.Track(itemProcessor());
     }
 
-    private void CleanupCompleted()
+    public async ValueTask WaitAsync(CancellationToken ct)
     {
-        while (_tasks.Count > 0)
-        {
-            var waitForCompleted = Task.WhenAny(_tasks);
-            if (!waitForCompleted.IsCompleted) // No completed tasks, so we need to wait
-                return;
-
-            _tasks.Remove(waitForCompleted.Result);
-        }
-    }
-
-    public async ValueTask WaitAsync(CancellationToken forceExitToken)
-    {
-        var cancellationTask = Task.Delay(Timeout.Infinite, forceExitToken);
-        while (_tasks.Count > 0)
-        {
-            var waitForCompleted = Task.WhenAny(_tasks.Append(cancellationTask));
-
-            var completed = await waitForCompleted;
-            if (completed == cancellationTask)
-                return; // Exit has been forced
-
-            _tasks.Remove(completed);
-        }
+        _tasks.CleanupCompleted();
+        while (!IsEmpty)
+            await _tasks.WaitForCompleted(ct);
     }
 }

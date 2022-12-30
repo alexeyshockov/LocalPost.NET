@@ -4,7 +4,7 @@ namespace LocalPost;
 
 public interface IBackgroundQueue<in T>
 {
-    ValueTask Enqueue(T item, CancellationToken ct);
+    ValueTask Enqueue(T item, CancellationToken ct = default);
 }
 
 public interface IBackgroundQueueReader<TOut>
@@ -22,7 +22,7 @@ public delegate Task MessageHandler<in T>(T context, CancellationToken ct);
 
 
 // Simplest background queue
-internal sealed class BackgroundQueue<T> : IBackgroundQueue<T>, IBackgroundQueueReader<T>
+public sealed class BackgroundQueue<T> : IBackgroundQueue<T>, IAsyncEnumerable<T>
 {
     private readonly Channel<T> _messages = Channel.CreateUnbounded<T>(new UnboundedChannelOptions
     {
@@ -30,7 +30,8 @@ internal sealed class BackgroundQueue<T> : IBackgroundQueue<T>, IBackgroundQueue
         SingleWriter = false,
     });
 
-    public ValueTask Enqueue(T item, CancellationToken ct) => _messages.Writer.WriteAsync(item, ct);
+    public ValueTask Enqueue(T item, CancellationToken ct = default) => _messages.Writer.WriteAsync(item, ct);
 
-    public ChannelReader<T> Reader => _messages.Reader;
+    public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken ct = default) =>
+        _messages.Reader.ReadAllAsync(ct).GetAsyncEnumerator(ct);
 }
