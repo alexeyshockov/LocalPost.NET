@@ -6,8 +6,8 @@
         <!-- See https://docs.microsoft.com/en-us/nuget/create-packages/creating-a-package-dotnet-cli -->
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 
-        <PackageId>LocalPost.SqsConsumer</PackageId>
-        <PackageTags>background;task;queue;amazon;sqs;aws</PackageTags>
+        <PackageId>LocalPost.KafkaConsumer</PackageId>
+        <PackageTags>background;task;queue;kafka</PackageTags>
         <Description>Local (in-process) background queue for sending to Amazon SNS.</Description>
         <Authors>Alexey Shokov</Authors>
         <!-- See https://devblogs.microsoft.com/nuget/add-a-readme-to-your-nuget-package/ -->
@@ -40,7 +40,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="AWSSDK.SQS" Version="[3.7.2,4.0.0)" />
+        <PackageReference Include="Confluent.Kafka" Version="1.9.3" />
         <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="6.0.0" />
         <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="6.0.0" />
 

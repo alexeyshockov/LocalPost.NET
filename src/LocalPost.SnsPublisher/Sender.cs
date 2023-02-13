@@ -1,14 +1,14 @@
+using System.Diagnostics;
 using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
 using Microsoft.Extensions.Logging;
 
 namespace LocalPost.SnsPublisher;
 
-/// <summary>
-/// Default implementation
-/// </summary>
 internal sealed class Sender
 {
+    private static readonly ActivitySource Tracer = new(typeof(Sender).Namespace);
+
     private readonly ILogger<Sender> _logger;
     private readonly IAmazonSimpleNotificationService _sns;
 
@@ -18,9 +18,11 @@ internal sealed class Sender
         _sns = sns;
     }
 
-    public async Task Send(PublishBatchRequest payload, CancellationToken ct)
+    public async Task SendAsync(PublishBatchRequest payload, CancellationToken ct)
     {
-        _logger.LogTrace("Sending a batch of {Amount} publish request(s) to SNS...", payload.PublishBatchRequestEntries.Count);
+        using var span = Tracer.StartActivity();
+
+        _logger.LogTrace("Sending a batch of {Amount} message(s) to SNS...", payload.PublishBatchRequestEntries.Count);
         var batchResponse = await _sns.PublishBatchAsync(payload, ct);
 
         if (batchResponse.Failed.Any())

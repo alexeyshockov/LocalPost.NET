@@ -13,11 +13,11 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<Sender>();
 
         return services
-            .AddAmazonSnsBatchPublisher(provider => provider.GetRequiredService<Sender>().Send);
+            .AddAmazonSnsBatchPublisher(provider => provider.GetRequiredService<Sender>().SendAsync);
     }
 
     public static OptionsBuilder<QueueOptions> AddAmazonSnsBatchPublisher(this IServiceCollection services,
-        Func<IServiceProvider, MessageHandler<PublishBatchRequest>> handlerFactory)
+        HandlerFactory<PublishBatchRequest> handlerFactory)
     {
         services.TryAddSingleton<Publisher>();
         services.TryAddSingleton<ISnsPublisher>(provider => provider.GetRequiredService<Publisher>());

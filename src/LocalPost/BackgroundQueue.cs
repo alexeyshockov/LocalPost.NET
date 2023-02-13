@@ -12,18 +12,31 @@ public interface IBackgroundQueueReader<TOut>
     public ChannelReader<TOut> Reader { get; }
 }
 
-public interface IMessageHandler<in TOut>
+public interface IHandler<in TOut>
 {
-    Task Process(TOut payload, CancellationToken ct);
+    Task InvokeAsync(TOut payload, CancellationToken ct);
 }
 
-public delegate Task MessageHandler<in T>(T context, CancellationToken ct);
+public interface IMiddleware<T>
+{
+    Handler<T> Invoke(Handler<T> next);
+}
+
+public delegate Task Handler<in T>(T context, CancellationToken ct);
+
+public delegate Handler<T> HandlerFactory<in T>(IServiceProvider provider);
+
+public delegate Handler<T> Middleware<T>(Handler<T> next);
+//public delegate Task Middleware<T>(T context, Handler<T> next, CancellationToken ct);
+
+public delegate Middleware<T> MiddlewareFactory<T>(IServiceProvider provider);
 
 
 
 // Simplest background queue
-public sealed class BackgroundQueue<T> : IBackgroundQueue<T>, IAsyncEnumerable<T>
+public sealed partial class BackgroundQueue<T> : IBackgroundQueue<T>, IAsyncEnumerable<T>
 {
+    // TODO Bounded version (1000 by default), overflow should be dropped with a log message
     private readonly Channel<T> _messages = Channel.CreateUnbounded<T>(new UnboundedChannelOptions
     {
         SingleReader = false,
