@@ -7,23 +7,13 @@ using static Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult;
 
 namespace LocalPost;
 
-internal interface IBackgroundService : INamedService
-{
-    Task StartAsync(CancellationToken ct);
-
-    Task ExecuteAsync(CancellationToken ct);
-
-    Task StopAsync(CancellationToken ct);
-}
-
-internal sealed class BackgroundServiceSupervisor<T> : IHostedService, INamedService, IDisposable
-    where T : class, IBackgroundService
+internal abstract class BackgroundServiceSupervisor : IHostedService, INamedService, IDisposable
 {
     public sealed class LivenessCheck : IHealthCheck
     {
-        private readonly BackgroundServiceSupervisor<T> _supervisor;
+        private readonly BackgroundServiceSupervisor _supervisor;
 
-        public LivenessCheck(BackgroundServiceSupervisor<T> supervisor)
+        public LivenessCheck(BackgroundServiceSupervisor supervisor)
         {
             _supervisor = supervisor;
         }
@@ -46,9 +36,9 @@ internal sealed class BackgroundServiceSupervisor<T> : IHostedService, INamedSer
 
     public sealed class ReadinessCheck : IHealthCheck
     {
-        private readonly BackgroundServiceSupervisor<T> _supervisor;
+        private readonly BackgroundServiceSupervisor _supervisor;
 
-        public ReadinessCheck(BackgroundServiceSupervisor<T> supervisor)
+        public ReadinessCheck(BackgroundServiceSupervisor supervisor)
         {
             _supervisor = supervisor;
         }
@@ -68,18 +58,18 @@ internal sealed class BackgroundServiceSupervisor<T> : IHostedService, INamedSer
         }
     }
 
-    private readonly ILogger<BackgroundServiceSupervisor<T>> _logger;
+    private readonly ILogger<BackgroundServiceSupervisor> _logger;
 
     private CancellationTokenSource? _executionCts;
     private Task? _execution;
 
-    public BackgroundServiceSupervisor(ILogger<BackgroundServiceSupervisor<T>> logger, T service)
+    public BackgroundServiceSupervisor(ILogger<BackgroundServiceSupervisor> logger, IBackgroundService service)
     {
         _logger = logger;
         Service = service;
     }
 
-    public T Service { get; }
+    public IBackgroundService Service { get; }
 
     public string Name => Service.Name;
 
@@ -101,7 +91,7 @@ internal sealed class BackgroundServiceSupervisor<T> : IHostedService, INamedSer
 
         try
         {
-            await Service.StartAsync(ct).ConfigureAwait(false);
+            await Service.StartAsync(ct);
 
             // Store the task we're executing
             _execution = ExecuteAsync(_executionCts.Token);
@@ -126,6 +116,7 @@ internal sealed class BackgroundServiceSupervisor<T> : IHostedService, INamedSer
         try
         {
             await Service.ExecuteAsync(stoppingToken);
+            _logger.LogInformation("{Name} background queue is completed", Name);
         }
         catch (OperationCanceledException e) when (e.CancellationToken == stoppingToken)
         {
@@ -150,16 +141,28 @@ internal sealed class BackgroundServiceSupervisor<T> : IHostedService, INamedSer
         {
             if (_execution is not null)
                 // Wait until the execution completes or the app is forced to exit
-                await Task.WhenAny(_execution, Task.Delay(Timeout.Infinite, forceExitToken)).ConfigureAwait(false);
+                await Task.WhenAny(_execution, Task.Delay(Timeout.Infinite, forceExitToken));
         }
 
-        await Service.StopAsync(forceExitToken).ConfigureAwait(false);
+        await Service.StopAsync(forceExitToken);
     }
 
     public void Dispose()
     {
         _executionCts?.Cancel();
+        // ReSharper disable once SuspiciousTypeConversion.Global
         if (Service is IDisposable disposableService)
             disposableService.Dispose();
     }
+}
+
+internal sealed class BackgroundServiceSupervisor<T> : BackgroundServiceSupervisor
+    where T : class, IBackgroundService
+{
+    public BackgroundServiceSupervisor(ILogger<BackgroundServiceSupervisor<T>> logger, T service) : base(logger, service)
+    {
+        Service = service;
+    }
+
+    public new T Service { get; }
 }

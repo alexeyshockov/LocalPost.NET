@@ -3,24 +3,18 @@ using Microsoft.Extensions.Options;
 
 namespace LocalPost.SqsConsumer;
 
-public static partial class Consumer
+public static partial class MessageSource
 {
     internal sealed class Service : IBackgroundService
     {
         private readonly QueueClient _client;
         private readonly Channel<ConsumeContext> _queue;
 
-        public Service(string name, QueueClient client, IOptionsMonitor<ConsumerOptions> options)
+        public Service(string name, QueueClient client, IOptionsMonitor<Options> options)
         {
             var config = options.Get(name);
 
             _client = client;
-            _queue = Channel.CreateBounded<ConsumeContext>(new BoundedChannelOptions(config.BufferSize)
-            {
-                SingleWriter = true,
-                SingleReader = true
-                // TODO AllowSynchronousContinuations?..
-            });
 
             Name = name;
         }
@@ -44,7 +38,12 @@ public static partial class Consumer
             }
         }
 
-        public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
+        public Task StopAsync(CancellationToken ct)
+        {
+            _queue.Writer.Complete();
+
+            return Task.CompletedTask;
+        }
 
         private async Task Consume(CancellationToken stoppingToken)
         {

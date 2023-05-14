@@ -1,4 +1,4 @@
-using System.Threading.Channels;
+using System.Collections.Immutable;
 using Amazon.SimpleNotificationService.Model;
 
 namespace LocalPost.SnsPublisher;
@@ -8,52 +8,47 @@ public interface ISnsPublisher
     IBackgroundQueue<PublishBatchRequestEntry> ForTopic(string arn);
 }
 
-internal sealed class Publisher : ISnsPublisher, IAsyncEnumerable<PublishBatchRequest>, IDisposable
+internal sealed partial class Publisher : ISnsPublisher, IAsyncEnumerable<PublishBatchRequest>,
+    IBackgroundQueueManager<PublishBatchRequest>, IDisposable
 {
-    private sealed class TopicPublishingQueue : IBackgroundQueue<PublishBatchRequestEntry>
-    {
-        private readonly Channel<PublishBatchRequestEntry> _batchEntries;
+    private ImmutableDictionary<string, TopicPublishRequests> _channels =
+        ImmutableDictionary<string, TopicPublishRequests>.Empty;
 
-        public TopicPublishingQueue(string arn)
-        {
-            _batchEntries = Channel.CreateUnbounded<PublishBatchRequestEntry>(new UnboundedChannelOptions
-            {
-                SingleReader = true,
-                SingleWriter = false
-            });
-            Results = _batchEntries.Reader.ReadAllAsync().Batch(() => new SnsBatchBuilder(arn));
-        }
-
-        public IAsyncEnumerable<PublishBatchRequest> Results { get; }
-
-        public ValueTask Enqueue(PublishBatchRequestEntry item, CancellationToken ct = default)
-        {
-            if (item.CalculateSize() > PublisherOptions.RequestMaxSize)
-                throw new ArgumentOutOfRangeException(nameof(item), "Message is too big");
-
-            return _batchEntries.Writer.WriteAsync(item, ct);
-        }
-    }
-
-    private readonly Dictionary<string, TopicPublishingQueue> _channels = new();
     private readonly AsyncEnumerableMerger<PublishBatchRequest> _combinedReader = new(true);
 
-    private TopicPublishingQueue Create(string arn)
-    {
-        var q = _channels[arn] = new TopicPublishingQueue(arn);
-        _combinedReader.Add(q.Results);
+    private readonly PublisherOptions _options;
 
-        return q;
+    public Publisher(PublisherOptions options)
+    {
+        _options = options;
     }
 
-    public IBackgroundQueue<PublishBatchRequestEntry> ForTopic(string arn) =>
-        _channels.TryGetValue(arn, out var queue) ? queue : Create(arn);
+    public bool IsClosed { get; private set; }
 
-    public void Dispose()
+    public IBackgroundQueue<PublishBatchRequestEntry> ForTopic(string arn) =>
+        ImmutableInterlocked.GetOrAdd(ref _channels, arn, RegisterQueueFor);
+
+    private TopicPublishRequests RegisterQueueFor(string arn)
     {
-        _combinedReader.Dispose();
+        var queue = new TopicPublishRequests(_options.PerTopic, arn);
+        _combinedReader.Add(queue);
+
+        return queue;
     }
 
     public IAsyncEnumerator<PublishBatchRequest> GetAsyncEnumerator(CancellationToken ct = default) =>
         _combinedReader.GetAsyncEnumerator(ct);
+
+    public async ValueTask CompleteAsync(CancellationToken ct = default)
+    {
+        // TODO Do not allow to register new topics, as they won't be processed here...
+        await Task.WhenAll(_channels.Values.Select(q => q.CompleteAsync(ct).AsTask()));
+        IsClosed = true;
+    }
+
+    public void Dispose()
+    {
+        _combinedReader.Dispose();
+        _channels = ImmutableDictionary<string, TopicPublishRequests>.Empty;
+    }
 }

@@ -9,7 +9,7 @@ namespace LocalPost.SqsConsumer;
 /// <summary>
 ///     General SQS consumer settings
 /// </summary>
-public sealed record ConsumerOptions
+public sealed record Options
 {
     internal static readonly List<string> AllAttributes = new() { "All" };
     internal static readonly List<string> AllMessageAttributes = new() { "All" };

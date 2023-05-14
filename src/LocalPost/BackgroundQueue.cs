@@ -1,15 +1,23 @@
 using System.Threading.Channels;
+using Microsoft.Extensions.Options;
 
 namespace LocalPost;
 
 public interface IBackgroundQueue<in T>
 {
+    // TODO Custom exception when closed?.. Or just return true/false?..
     ValueTask Enqueue(T item, CancellationToken ct = default);
 }
 
-public interface IBackgroundQueueReader<TOut>
+// TODO Open to public later
+internal interface IBackgroundQueueManager<in T>
 {
-    public ChannelReader<TOut> Reader { get; }
+    // Implement later for a better health check
+//    bool IsFull { get; }
+
+    bool IsClosed { get; }
+
+    ValueTask CompleteAsync(CancellationToken ct = default);
 }
 
 public interface IHandler<in TOut>
@@ -33,18 +41,60 @@ public delegate Middleware<T> MiddlewareFactory<T>(IServiceProvider provider);
 
 
 
-// Simplest background queue
-public sealed partial class BackgroundQueue<T> : IBackgroundQueue<T>, IAsyncEnumerable<T>
+public sealed partial class BackgroundQueue<T> : IBackgroundQueue<T>, IBackgroundQueueManager<T>, IAsyncEnumerable<T>
 {
-    // TODO Bounded version (1000 by default), overflow should be dropped with a log message
-    private readonly Channel<T> _messages = Channel.CreateUnbounded<T>(new UnboundedChannelOptions
+    private readonly TimeSpan _completionTimeout;
+
+    // For the DI container
+    public BackgroundQueue(IOptions<BackgroundQueueOptions<T>> options) : this(options.Value.Queue)
     {
-        SingleReader = false,
-        SingleWriter = false,
-    });
+    }
 
-    public ValueTask Enqueue(T item, CancellationToken ct = default) => _messages.Writer.WriteAsync(item, ct);
+    public BackgroundQueue(QueueOptions options) : this(
+        options.MaxSize switch
+        {
+            not null => Channel.CreateBounded<T>(new BoundedChannelOptions(options.MaxSize.Value)
+            {
+                SingleReader = true,
+                SingleWriter = false,
+            }),
+            _ => Channel.CreateUnbounded<T>(new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = false,
+            })
+        },
+        TimeSpan.FromMilliseconds(options.CompletionTimeout ?? 0))
+    {
+    }
 
-    public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken ct = default) =>
-        _messages.Reader.ReadAllAsync(ct).GetAsyncEnumerator(ct);
+    public BackgroundQueue(Channel<T> messages, TimeSpan completionTimeout)
+    {
+        _completionTimeout = completionTimeout;
+        Messages = messages;
+    }
+
+    protected Channel<T> Messages { get; }
+
+    public bool IsClosed { get; private set; }
+
+    public ValueTask Enqueue(T item, CancellationToken ct = default) => Messages.Writer.WriteAsync(item, ct);
+
+    public async IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken ct = default)
+    {
+        while (await Messages.Reader.WaitToReadAsync(ct))
+            while (Messages.Reader.TryRead(out var item))
+                yield return item;
+    }
+
+    public async ValueTask CompleteAsync(CancellationToken ct = default)
+    {
+        if (IsClosed)
+            return;
+
+        await Task.Delay(_completionTimeout, ct);
+
+        Messages.Writer.Complete(); // TODO Handle exceptions
+        IsClosed = true;
+    }
 }

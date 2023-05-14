@@ -1,43 +1,37 @@
 using System.Threading.Channels;
 using Confluent.Kafka;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace LocalPost.KafkaConsumer;
 
-public static partial class Consumer<TKey, TValue>
+public static partial class MessageSource<TKey, TValue>
 {
-    internal sealed class Service : BackgroundService
+    internal sealed class Service : IBackgroundService, IDisposable
     {
         private readonly ILogger<Service> _logger;
-        private readonly ConsumerOptions _options;
+        private readonly Options _options;
 
         private readonly IConsumer<TKey, TValue> _kafka;
         private readonly ChannelWriter<ConsumeContext<TKey, TValue>> _queue;
-        private readonly Handler<ConsumeException> _errorHandler;
 
-        public Service(ILogger<Service> logger, ConsumerOptions options, string name, IConsumer<TKey, TValue> kafka,
-            ChannelWriter<ConsumeContext<TKey, TValue>> queue, Handler<ConsumeException> errorHandler)
+        public Service(ILogger<Service> logger, string name, Options options, IConsumer<TKey, TValue> kafka,
+            ChannelWriter<ConsumeContext<TKey, TValue>> queue)
         {
             _logger = logger;
             _options = options;
             _kafka = kafka;
             _queue = queue;
-            _errorHandler = errorHandler;
             Name = name;
         }
 
         public string Name { get; }
 
-        public bool Closed { get; private set; }
+        public Task StartAsync(CancellationToken ct) => Task.Run(() => _kafka.Subscribe(_options.TopicName), ct);
 
-        protected override Task ExecuteAsync(CancellationToken stoppingToken) =>
-            Task.Run(() => Run(stoppingToken), stoppingToken);
+        public Task ExecuteAsync(CancellationToken ct) => Task.Run(() => Run(ct), ct);
 
         private async Task Run(CancellationToken stoppingToken = default)
         {
-            _kafka.Subscribe(_options.TopicName);
-
             while (!stoppingToken.IsCancellationRequested)
             {
                 await Task.Yield();
@@ -53,11 +47,6 @@ public static partial class Consumer<TKey, TValue>
                     // Just complete the method normally...
                 }
             }
-
-            _logger.LogInformation("Stopping Kafka {Topic} consumer...", _options.TopicName);
-            Closed = true;
-            _kafka.Close();
-            _queue.Complete();
         }
 
         private async Task Consume(CancellationToken stoppingToken)
@@ -81,13 +70,21 @@ public static partial class Consumer<TKey, TValue>
                 _logger.LogError(e, "Kafka {Topic} consumer error, help link: {HelpLink}",
                     _options.TopicName, e.HelpLink);
 
-                await _errorHandler(e, stoppingToken); // TODO exit the app if configured...
+                // Bubble up, so the supervisor can report the error and the whole app can be restarted (Kubernetes)
+                throw;
             }
         }
 
-        public override void Dispose()
+        public Task StopAsync(CancellationToken ct) => Task.Run(() =>
         {
-            base.Dispose();
+            _logger.LogInformation("Stopping Kafka {Topic} consumer...", _options.TopicName);
+
+            _kafka.Close();
+            _queue.Complete();
+        }, ct);
+
+        public void Dispose()
+        {
             _kafka.Dispose();
         }
     }

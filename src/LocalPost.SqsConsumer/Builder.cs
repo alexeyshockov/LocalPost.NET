@@ -1,14 +1,18 @@
-using System.Collections.Immutable;
-using LocalPost.DependencyInjection;
+using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace LocalPost.SqsConsumer;
 
-public static partial class Consumer
+public static partial class MessageSource
 {
     public sealed class Builder
     {
+        private Channel<ConsumeContext> _queue = Channel.CreateBounded<ConsumeContext>(new BoundedChannelOptions(config.BufferSize)
+            {
+                SingleWriter = true,
+                SingleReader = true
+            });
+
         public Builder(string name)
         {
             Name = name;
@@ -17,23 +21,20 @@ public static partial class Consumer
 
         public string Name { get; }
 
-        // TODO Use...
-        public Handler<Exception> ErrorHandler { get; set; } = (m, ct) => Task.CompletedTask;
-
         public MiddlewareStackBuilder<ConsumeContext> MiddlewareStackBuilder { get; } = new();
 
         internal HandlerFactory<ConsumeContext> BuildHandlerFactory() =>
             MiddlewareStackBuilder.Build().Resolve;
 
-        internal IHostedService Build(IServiceProvider provider)
+        internal BackgroundServiceSupervisor Build(IServiceProvider provider)
         {
             var client = ActivatorUtilities.CreateInstance<QueueClient>(provider, Name);
             var consumer = ActivatorUtilities.CreateInstance<Service>(provider, Name, client);
 
-            var consumerSupervisor = ActivatorUtilities.CreateInstance<BackgroundServiceSupervisor<Service>>(provider,
-                Name, consumer);
+            var supervisor = ActivatorUtilities
+                .CreateInstance<BackgroundServiceSupervisor<Service>>(provider, consumer);
 
-            return consumerSupervisor;
+            return supervisor;
         }
     }
 }

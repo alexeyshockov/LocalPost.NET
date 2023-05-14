@@ -8,17 +8,25 @@ namespace LocalPost.SqsConsumer;
 
 internal sealed class QueueClient
 {
+    // TODO Add more details
+    // See https://github.com/npgsql/npgsql/blob/main/src/Npgsql/NpgsqlActivitySource.cs#LL61C31-L61C49
+    // See https://github.com/npgsql/npgsql/blob/main/src/Npgsql/NpgsqlCommand.cs#L1639-L1644
     private static readonly ActivitySource Tracer = new(typeof(QueueClient).Namespace);
 
     private readonly ILogger<QueueClient> _logger;
     private readonly IAmazonSQS _sqs;
-    private readonly ConsumerOptions _options;
+    private readonly Options _options;
 
-    public QueueClient(ILogger<QueueClient> logger, string name, IAmazonSQS sqs, IOptionsMonitor<ConsumerOptions> options)
+    public QueueClient(ILogger<QueueClient> logger, string name, IOptionsMonitor<Options> options, IAmazonSQS sqs) :
+        this(logger, options.Get(name), sqs)
+    {
+    }
+
+    public QueueClient(ILogger<QueueClient> logger, Options options, IAmazonSQS sqs)
     {
         _logger = logger;
         _sqs = sqs;
-        _options = options.Get(name);
+        _options = options;
     }
 
     private GetQueueAttributesResponse? _queueAttributes;
@@ -47,7 +55,7 @@ internal sealed class QueueClient
         try
         {
             // Checking for a possible error in the response would be also good...
-            _queueAttributes = await _sqs.GetQueueAttributesAsync(QueueUrl, ConsumerOptions.AllAttributes, ct);
+            _queueAttributes = await _sqs.GetQueueAttributesAsync(QueueUrl, Options.AllAttributes, ct);
         }
         catch (OperationCanceledException e) when (e.CancellationToken == ct)
         {
@@ -72,8 +80,8 @@ internal sealed class QueueClient
     {
         using var span = Tracer.StartActivity();
 
-        var attributeNames = ConsumerOptions.AllAttributes; // TODO Configurable
-        var messageAttributeNames = ConsumerOptions.AllMessageAttributes; // TODO Configurable
+        var attributeNames = Options.AllAttributes; // TODO Configurable
+        var messageAttributeNames = Options.AllMessageAttributes; // TODO Configurable
 
         try
         {
@@ -100,11 +108,10 @@ internal sealed class QueueClient
         {
             throw;
         }
-        catch (Exception e)
+        catch (Exception)
         {
-            // FIXME Error handler
+            // Just bubble up, so the supervisor can report the error and the whole app can be restarted (Kubernetes)
+            throw;
         }
-
-        return Array.Empty<ConsumeContext>();
     }
 }

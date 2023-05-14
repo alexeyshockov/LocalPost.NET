@@ -11,11 +11,13 @@ internal sealed class BackgroundQueueConsumer<T> : IBackgroundService
 
     private readonly IAsyncEnumerable<T> _reader;
     private readonly IExecutor _executor;
-    private readonly Func<IServiceProvider, Handler<T>> _handlerFactory;
+    private readonly HandlerFactory<T> _handlerFactory;
 
-    public BackgroundQueueConsumer(string name,
-        ILogger<BackgroundQueueConsumer<T>> logger, IServiceScopeFactory scopeFactory,
-        IExecutor executor, IAsyncEnumerable<T> reader, Func<IServiceProvider, Handler<T>> handlerFactory)
+    public BackgroundQueueConsumer(ILogger<BackgroundQueueConsumer<T>> logger, string name,
+        IServiceScopeFactory scopeFactory,
+        IExecutor executor,
+        IAsyncEnumerable<T> reader,
+        HandlerFactory<T> handlerFactory)
     {
         Name = name;
         _logger = logger;
@@ -38,24 +40,24 @@ internal sealed class BackgroundQueueConsumer<T> : IBackgroundService
         }
         catch (ChannelClosedException e)
         {
-            // TODO isRunning above...
             _logger.LogWarning(e, "{Name} queue has been closed, stop listening", Name);
 
-            // The rest of the queue will be processed in StopAsync() below
+            // All currently running tasks will be processed in StopAsync() below
         }
     }
 
     public async Task StopAsync(CancellationToken forceExitToken)
     {
+        // Good to have later: an option to NOT process the rest of the messages
         try
         {
             // TODO An option to NOT process the rest of the messages...
             await foreach (var message in _reader.WithCancellation(forceExitToken))
                 await _executor.StartAsync(() => Process(message, forceExitToken), forceExitToken);
         }
-        catch (ChannelClosedException e)
+        catch (ChannelClosedException)
         {
-            // TODO Do something?
+            // OK, just wait for the rest of the tasks to finish
         }
 
         // Wait until all currently running tasks are finished

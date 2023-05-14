@@ -1,23 +1,26 @@
-using System.Threading.Channels;
-
 namespace LocalPost;
 
 public delegate Task Job(CancellationToken ct);
 
+/// <summary>
+///     Just a convenient alias for <see cref="IBackgroundQueue{T}" />.
+/// </summary>
 public interface IBackgroundJobQueue : IBackgroundQueue<Job>
 {
 }
 
-internal sealed class BackgroundJobQueue : IBackgroundJobQueue, IAsyncEnumerable<Job>
+internal sealed class BackgroundJobQueue : IBackgroundJobQueue, IBackgroundQueueManager<Job>
 {
-    private readonly Channel<Job> _messages = Channel.CreateUnbounded<Job>(new UnboundedChannelOptions
+    private readonly BackgroundQueue<Job> _queue;
+
+    public BackgroundJobQueue(BackgroundQueue<Job> queue)
     {
-        SingleReader = true,
-        SingleWriter = false,
-    });
+        _queue = queue;
+    }
 
-    public ValueTask Enqueue(Job item, CancellationToken ct = default) => _messages.Writer.WriteAsync(item, ct);
+    public bool IsClosed => _queue.IsClosed;
 
-    public IAsyncEnumerator<Job> GetAsyncEnumerator(CancellationToken cancellationToken = default) =>
-        _messages.Reader.ReadAllAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
+    public ValueTask Enqueue(Job item, CancellationToken ct = default) => _queue.Enqueue(item, ct);
+
+    public ValueTask CompleteAsync(CancellationToken ct = default) => _queue.CompleteAsync(ct);
 }

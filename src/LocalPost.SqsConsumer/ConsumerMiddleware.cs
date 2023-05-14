@@ -2,9 +2,9 @@ using Amazon.SQS;
 
 namespace LocalPost.SqsConsumer;
 
-public static partial class Consumer
+public static partial class MessageSource
 {
-    internal sealed class Middleware : IMiddleware<ConsumeContext>
+    internal sealed class Middleware : IMiddleware<ConsumeContext> // TODO Rename
     {
         private readonly IAmazonSQS _sqs;
 

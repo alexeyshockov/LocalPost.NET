@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace LocalPost.SnsPublisher;
 
-internal sealed class Sender
+internal sealed class Sender : IHandler<PublishBatchRequest>
 {
     private static readonly ActivitySource Tracer = new(typeof(Sender).Namespace);
 
@@ -18,7 +18,7 @@ internal sealed class Sender
         _sns = sns;
     }
 
-    public async Task SendAsync(PublishBatchRequest payload, CancellationToken ct)
+    public async Task InvokeAsync(PublishBatchRequest payload, CancellationToken ct)
     {
         using var span = Tracer.StartActivity();
 

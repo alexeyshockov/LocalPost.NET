@@ -6,12 +6,12 @@ namespace LocalPost.DependencyInjection;
 
 public static class JobQueueRegistration
 {
-    public static OptionsBuilder<QueueOptions> AddBackgroundJobQueue(this IServiceCollection services)
+    public static OptionsBuilder<BackgroundQueueOptions<Job>> AddBackgroundJobQueue(this IServiceCollection services)
     {
         services.TryAddSingleton<BackgroundJobQueue>();
         services.TryAddSingleton<IBackgroundJobQueue>(provider => provider.GetRequiredService<BackgroundJobQueue>());
 
-        return services.AddBackgroundQueueConsumer<Job, BackgroundJobQueue>(builder =>
+        return services.AddBackgroundQueue<Job>(builder =>
             builder.MiddlewareStackBuilder.SetHandler((job, ct) => job(ct)));
     }
 }

@@ -1,15 +1,14 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace LocalPost;
 
 public sealed partial class BackgroundQueue<T>
 {
-    public sealed class Builder
+    public sealed class ConsumerBuilder
     {
         private Func<IServiceProvider, IAsyncEnumerable<T>>? _readerFactory;
 
-        public Builder(string name)
+        public ConsumerBuilder(string name)
         {
             Name = name;
         }
@@ -18,7 +17,7 @@ public sealed partial class BackgroundQueue<T>
 
         public MiddlewareStackBuilder<T> MiddlewareStackBuilder { get; } = new();
 
-        public Builder SetReaderFactory(Func<IServiceProvider, IAsyncEnumerable<T>> factory)
+        public ConsumerBuilder SetReaderFactory(Func<IServiceProvider, IAsyncEnumerable<T>> factory)
         {
             _readerFactory = factory;
 
@@ -28,18 +27,18 @@ public sealed partial class BackgroundQueue<T>
         private HandlerFactory<T> BuildHandlerFactory() =>
             MiddlewareStackBuilder.Build().Resolve;
 
-        internal IHostedService Build(IServiceProvider provider)
+        internal BackgroundServiceSupervisor Build(IServiceProvider provider)
         {
             // TODO Custom exception
             var readerFactory = _readerFactory ?? throw new Exception($"Reader factory is required");
 
             var executor = ActivatorUtilities.CreateInstance<BoundedExecutor>(provider, Name);
             var consumer = ActivatorUtilities.CreateInstance<BackgroundQueueConsumer<T>>(provider, Name,
-                readerFactory(provider), executor, BuildHandlerFactory());
-            var consumerSupervisor = ActivatorUtilities.CreateInstance<BackgroundServiceSupervisor<BackgroundQueueConsumer<T>>>(provider, Name,
-                consumer);
+                executor, readerFactory(provider), BuildHandlerFactory());
+            var supervisor = ActivatorUtilities
+                .CreateInstance<BackgroundServiceSupervisor<BackgroundQueueConsumer<T>>>(provider, consumer);
 
-            return consumerSupervisor;
+            return supervisor;
         }
     }
 }

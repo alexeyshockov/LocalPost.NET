@@ -8,14 +8,14 @@ using LocalPost.SqsConsumer.DependencyInjection;
 var builder = WebApplication.CreateBuilder(args);
 
 
-
 // A background queue with an inline handler
-builder.Services.AddBackgroundQueue<WeatherForecast>(_ => async (w, ct) =>
-{
-    await Task.Delay(TimeSpan.FromSeconds(2), ct);
-    Console.WriteLine(w.Summary);
-});
-
+builder.Services.AddBackgroundQueue<WeatherForecast>(
+    // TODO Automatically add the health checks?..
+    async (weather, ct) =>
+    {
+        await Task.Delay(TimeSpan.FromSeconds(2), ct);
+        Console.WriteLine(weather.Summary);
+    });
 
 
 // An async Amazon SNS sender, buffers messages and sends them in batches in the background
@@ -23,15 +23,14 @@ builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
 builder.Services.AddAmazonSnsBatchPublisher();
 
 
-
 // An Amazon SQS consumer
 builder.Services.AddAWSService<IAmazonSQS>();
-builder.Services.AddAmazonSqsMinimalConsumer("test", async (context, ct) =>
-{
-    await Task.Delay(1_000, ct);
-    Console.WriteLine(context.Body);
-});
-
+builder.Services.AddAmazonSqsConsumer("test",
+    async (context, ct) =>
+    {
+        await Task.Delay(1_000, ct);
+        Console.WriteLine(context.Message.Body);
+    });
 
 
 builder.Services.AddControllers();
@@ -45,6 +44,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();

@@ -18,8 +18,7 @@ internal sealed class BoundedExecutor : IExecutor
 {
     private readonly ConcurrentTasksList _tasks;
 
-    [ExcludeFromCodeCoverage]
-    public BoundedExecutor(string name, IOptionsMonitor<QueueOptions> options) : this(options.Get(name).MaxConcurrency)
+    public BoundedExecutor(string name, IOptionsMonitor<ConsumerOptions> options) : this(options.Get(name).MaxConcurrency)
     {
     }
 
