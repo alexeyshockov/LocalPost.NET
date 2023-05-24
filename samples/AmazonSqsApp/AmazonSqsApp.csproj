@@ -13,7 +13,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\LocalPost\LocalPost.csproj" />
-        <ProjectReference Include="..\..\src\LocalPost.SnsPublisher\LocalPost.SnsPublisher.csproj" />
         <ProjectReference Include="..\..\src\LocalPost.SqsConsumer\LocalPost.SqsConsumer.csproj" />
     </ItemGroup>
 

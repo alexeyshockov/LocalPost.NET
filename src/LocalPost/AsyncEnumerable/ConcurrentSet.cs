@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Immutable;
 using Nito.AsyncEx;
 
-namespace LocalPost;
+namespace LocalPost.AsyncEnumerable;
 
 internal sealed class ConcurrentSet<T> : IEnumerable<T>, IDisposable
 {

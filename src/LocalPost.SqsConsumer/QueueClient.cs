@@ -17,11 +17,6 @@ internal sealed class QueueClient
     private readonly IAmazonSQS _sqs;
     private readonly Options _options;
 
-    public QueueClient(ILogger<QueueClient> logger, string name, IOptionsMonitor<Options> options, IAmazonSQS sqs) :
-        this(logger, options.Get(name), sqs)
-    {
-    }
-
     public QueueClient(ILogger<QueueClient> logger, Options options, IAmazonSQS sqs)
     {
         _logger = logger;

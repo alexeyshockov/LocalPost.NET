@@ -1,6 +1,4 @@
-using Amazon.SimpleNotificationService.Model;
 using LocalPost;
-using LocalPost.SnsPublisher;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AmazonSqsApp.Controllers;
@@ -15,12 +13,10 @@ public class WeatherForecastController : ControllerBase
     };
 
     private readonly IBackgroundQueue<WeatherForecast> _queue;
-    private readonly ISnsPublisher _sns;
 
-    public WeatherForecastController(IBackgroundQueue<WeatherForecast> queue, ISnsPublisher sns)
+    public WeatherForecastController(IBackgroundQueue<WeatherForecast> queue)
     {
         _queue = queue;
-        _sns = sns;
     }
 
     [HttpGet(Name = "GetWeatherForecast")]
@@ -34,11 +30,6 @@ public class WeatherForecastController : ControllerBase
             }).ToArray();
 
         await _queue.Enqueue(forecasts[0]);
-
-        await _sns.ForTopic("arn:aws:sns:eu-central-1:703886664977:test").Enqueue(new PublishBatchRequestEntry
-        {
-            Message = forecasts[0].Summary
-        });
 
         return forecasts;
     }

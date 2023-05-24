@@ -9,7 +9,7 @@ public interface IBackgroundJobQueue : IBackgroundQueue<Job>
 {
 }
 
-internal sealed class BackgroundJobQueue : IBackgroundJobQueue, IBackgroundQueueManager<Job>
+internal sealed class BackgroundJobQueue : IBackgroundJobQueue
 {
     private readonly BackgroundQueue<Job> _queue;
 
@@ -18,9 +18,5 @@ internal sealed class BackgroundJobQueue : IBackgroundJobQueue, IBackgroundQueue
         _queue = queue;
     }
 
-    public bool IsClosed => _queue.IsClosed;
-
     public ValueTask Enqueue(Job item, CancellationToken ct = default) => _queue.Enqueue(item, ct);
-
-    public ValueTask CompleteAsync(CancellationToken ct = default) => _queue.CompleteAsync(ct);
 }

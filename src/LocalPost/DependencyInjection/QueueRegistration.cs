@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace LocalPost.DependencyInjection;
@@ -8,55 +9,39 @@ public static class QueueRegistration
 {
     // THandler has to be registered by the user
     public static OptionsBuilder<BackgroundQueueOptions<T>> AddBackgroundQueue<T, THandler>(this IServiceCollection services,
-        Action<BackgroundQueue<T>.ConsumerBuilder>? configure = null) where THandler : IHandler<T> =>
+        Action<MiddlewareStackBuilder<T>>? configure = null) where THandler : IHandler<T> =>
         services.AddBackgroundQueue<T>(builder =>
         {
-            builder.MiddlewareStackBuilder.SetHandler<THandler>();
+            builder.SetHandler<THandler>();
             configure?.Invoke(builder);
         });
 
     public static OptionsBuilder<BackgroundQueueOptions<T>> AddBackgroundQueue<T>(this IServiceCollection services,
-        Handler<T> handler, Action<BackgroundQueue<T>.ConsumerBuilder>? configure = null) =>
+        Handler<T> handler, Action<MiddlewareStackBuilder<T>>? configure = null) =>
         services.AddBackgroundQueue<T>(builder =>
         {
-            builder.MiddlewareStackBuilder.SetHandler(handler);
+            builder.SetHandler(handler);
             configure?.Invoke(builder);
         });
 
     public static OptionsBuilder<BackgroundQueueOptions<T>> AddBackgroundQueue<T>(this IServiceCollection services,
-        Action<BackgroundQueue<T>.ConsumerBuilder> configure)
+        Action<MiddlewareStackBuilder<T>> configure)
     {
-        services.TryAddSingleton<BackgroundQueue<T>>();
-        services.TryAddSingleton<IBackgroundQueue<T>>(provider => provider.GetRequiredService<BackgroundQueue<T>>());
+        var handleStackBuilder = new MiddlewareStackBuilder<T>();
+        configure(handleStackBuilder);
+        var handlerStack = handleStackBuilder.Build();
 
-        services
-            .AddBackgroundQueueConsumer<T, BackgroundQueue<T>>(configure)
-            .Configure<IOptions<BackgroundQueueOptions<T>>>(
-                (options, consumerOptions) => { options.MaxConcurrency = consumerOptions.Value.Consumer.MaxConcurrency; });
+        services.TryAddSingleton(provider => BackgroundQueueService<T>.Create(provider, handlerStack));
+
+        services.TryAddSingleton<IBackgroundQueue<T>>(provider =>
+            provider.GetRequiredService<BackgroundQueueService<T>>().Queue);
+        services.AddSingleton<IHostedService>(provider =>
+            provider.GetRequiredService<BackgroundQueueService<T>>().Supervisor);
+
+        // Extend ServiceDescriptor for better comparison and implement custom TryAddSingleton later...
 
         return services.AddOptions<BackgroundQueueOptions<T>>();
     }
 
-    // TReader has to be registered by the user
-    public static OptionsBuilder<ConsumerOptions> AddBackgroundQueueConsumer<T, TReader>(this IServiceCollection services,
-        Action<BackgroundQueue<T>.ConsumerBuilder> configure) where TReader : class, IAsyncEnumerable<T> =>
-        services.AddBackgroundQueueConsumer<T>(Reflection.FriendlyNameOf<T>(), builder => configure(
-            builder.SetReaderFactory(provider => provider.GetRequiredService<TReader>())));
-
-    public static OptionsBuilder<ConsumerOptions> AddBackgroundQueueConsumer<T>(this IServiceCollection services,
-        Action<BackgroundQueue<T>.ConsumerBuilder> configure) =>
-        services.AddBackgroundQueueConsumer(Reflection.FriendlyNameOf<T>(), configure);
-
-    public static OptionsBuilder<ConsumerOptions> AddBackgroundQueueConsumer<T>(this IServiceCollection services,
-        string name, Action<BackgroundQueue<T>.ConsumerBuilder> configure)
-    {
-        var builder = new BackgroundQueue<T>.ConsumerBuilder(name);
-        configure(builder);
-
-        // TODO Try...() version of this one, to be gentle with multiple registrations of the same queue
-        //      (extend ServiceDescriptor, add name to it and search using it)
-        services.AddHostedService(builder.Build);
-
-        return services.AddOptions<ConsumerOptions>(name);
-    }
+    // TODO Batched queue consumer
 }

@@ -1,8 +1,6 @@
-using LocalPost.DependencyInjection;
-
 namespace LocalPost;
 
-internal interface IBackgroundService : INamedService
+internal interface IBackgroundService
 {
     Task StartAsync(CancellationToken ct);
 

@@ -9,5 +9,8 @@ public sealed class Options
 
     [Required] public string TopicName { get; set; } = null!;
 
-    public ConsumerOptions Consumer { get; set; } = new();
+    /// <summary>
+    ///     How many messages to process in parallel.
+    /// </summary>
+    [Required] public ushort MaxConcurrency { get; set; } = ushort.MaxValue;
 }

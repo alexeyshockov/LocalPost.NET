@@ -12,6 +12,6 @@ public static class JobQueueRegistration
         services.TryAddSingleton<IBackgroundJobQueue>(provider => provider.GetRequiredService<BackgroundJobQueue>());
 
         return services.AddBackgroundQueue<Job>(builder =>
-            builder.MiddlewareStackBuilder.SetHandler((job, ct) => job(ct)));
+            builder.SetHandler((job, ct) => job(ct)));
     }
 }

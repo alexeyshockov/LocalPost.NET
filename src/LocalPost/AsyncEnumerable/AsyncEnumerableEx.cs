@@ -1,4 +1,4 @@
-namespace LocalPost;
+namespace LocalPost.AsyncEnumerable;
 
 internal static class AsyncEnumerableEx
 {

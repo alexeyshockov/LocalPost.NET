@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 
-namespace LocalPost;
+namespace LocalPost.AsyncEnumerable;
 
 internal sealed class AsyncEnumerableMerger<T> : IAsyncEnumerable<T>, IDisposable
 {

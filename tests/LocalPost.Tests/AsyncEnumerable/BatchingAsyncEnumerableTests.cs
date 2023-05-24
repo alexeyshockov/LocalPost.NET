@@ -1,5 +1,6 @@
 using System.Threading.Channels;
 using FluentAssertions;
+using LocalPost.AsyncEnumerable;
 
 namespace LocalPost.Tests;
 

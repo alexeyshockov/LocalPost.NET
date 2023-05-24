@@ -1,12 +1,11 @@
-using Amazon.SimpleNotificationService;
 using Amazon.SQS;
-using LocalPost.SnsPublisher.DependencyInjection;
-using LocalPost.DependencyInjection;
 using AmazonSqsApp;
+using LocalPost;
+using LocalPost.DependencyInjection;
+using LocalPost.SqsConsumer;
 using LocalPost.SqsConsumer.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
-
 
 // A background queue with an inline handler
 builder.Services.AddBackgroundQueue<WeatherForecast>(
@@ -18,19 +17,10 @@ builder.Services.AddBackgroundQueue<WeatherForecast>(
     });
 
 
-// An async Amazon SNS sender, buffers messages and sends them in batches in the background
-builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
-builder.Services.AddAmazonSnsBatchPublisher();
-
-
 // An Amazon SQS consumer
 builder.Services.AddAWSService<IAmazonSQS>();
-builder.Services.AddAmazonSqsConsumer("test",
-    async (context, ct) =>
-    {
-        await Task.Delay(1_000, ct);
-        Console.WriteLine(context.Message.Body);
-    });
+builder.Services.AddScoped<SqsHandler>();
+builder.Services.AddAmazonSqsConsumer<SqsHandler>("test");
 
 
 builder.Services.AddControllers();
@@ -49,3 +39,14 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
+
+
+
+class SqsHandler : IHandler<ConsumeContext>
+{
+    public async Task InvokeAsync(ConsumeContext payload, CancellationToken ct)
+    {
+        await Task.Delay(1_000, ct);
+        Console.WriteLine(payload.Message.Body);
+    }
+}

@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using LocalPost.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -9,15 +8,13 @@ public static class HealthChecks
 {
     [SuppressMessage("ReSharper", "PossibleMultipleEnumeration")]
     public static IHealthChecksBuilder AddKafkaConsumerReadinessCheck<TKey, TValue>(this IHealthChecksBuilder builder,
-        string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default,
-        TimeSpan? timeout = default) => builder
-        .AddBackgroundServiceReadinessCheck<MessageSource<TKey, TValue>.Service>(name, failureStatus, tags, timeout)
-        .AddBackgroundQueueConsumerReadinessCheck<ConsumeContext<TKey, TValue>>(name, failureStatus, tags, timeout);
+        string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default) => builder
+        .Add(KafkaConsumerService<TKey, TValue>.QueueReadinessCheck(name, failureStatus, tags))
+        .Add(KafkaConsumerService<TKey, TValue>.ConsumerGroupReadinessCheck(name, failureStatus, tags));
 
     [SuppressMessage("ReSharper", "PossibleMultipleEnumeration")]
     public static IHealthChecksBuilder AddKafkaConsumerLivenessCheck<TKey, TValue>(this IHealthChecksBuilder builder,
-        string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default,
-        TimeSpan? timeout = default) => builder
-        .AddBackgroundServiceLivenessCheck<MessageSource<TKey, TValue>.Service>(name, failureStatus, tags, timeout)
-        .AddBackgroundQueueConsumerLivenessCheck<ConsumeContext<TKey, TValue>>(name, failureStatus, tags, timeout);
+        string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default) => builder
+        .Add(KafkaConsumerService<TKey, TValue>.QueueLivenessCheck(name, failureStatus, tags))
+        .Add(KafkaConsumerService<TKey, TValue>.ConsumerGroupLivenessCheck(name, failureStatus, tags));
 }

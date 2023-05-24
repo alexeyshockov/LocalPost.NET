@@ -1,7 +1,8 @@
 using System.Threading.Channels;
 using FluentAssertions;
+using LocalPost.AsyncEnumerable;
 
-namespace LocalPost.Tests;
+namespace LocalPost.Tests.AsyncEnumerable;
 
 public class AsyncEnumerableMergerTests
 {

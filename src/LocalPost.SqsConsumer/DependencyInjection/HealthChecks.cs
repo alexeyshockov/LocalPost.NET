@@ -9,15 +9,13 @@ public static class HealthChecks
 {
     [SuppressMessage("ReSharper", "PossibleMultipleEnumeration")]
     public static IHealthChecksBuilder AddAmazonSqsConsumerReadinessCheck(this IHealthChecksBuilder builder,
-        string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default,
-        TimeSpan? timeout = default) => builder
-        .AddBackgroundServiceReadinessCheck<MessageSource.Service>(name, failureStatus, tags, timeout)
-        .AddBackgroundQueueConsumerReadinessCheck<ConsumeContext>(name, failureStatus, tags, timeout);
+        string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default) => builder
+        .Add(SqsConsumerService.QueueReadinessCheck(name, failureStatus, tags))
+        .Add(SqsConsumerService.ConsumerGroupReadinessCheck(name, failureStatus, tags));
 
     [SuppressMessage("ReSharper", "PossibleMultipleEnumeration")]
     public static IHealthChecksBuilder AddAmazonSqsConsumerLivenessCheck(this IHealthChecksBuilder builder,
-        string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default,
-        TimeSpan? timeout = default) => builder
-        .AddBackgroundServiceLivenessCheck<MessageSource.Service>(name, failureStatus, tags, timeout)
-        .AddBackgroundQueueConsumerLivenessCheck<ConsumeContext>(name, failureStatus, tags, timeout);
+        string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default) => builder
+        .Add(SqsConsumerService.QueueLivenessCheck(name, failureStatus, tags))
+        .Add(SqsConsumerService.ConsumerGroupLivenessCheck(name, failureStatus, tags));
 }

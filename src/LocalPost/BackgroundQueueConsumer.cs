@@ -1,90 +1,98 @@
 using System.Threading.Channels;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using LocalPost.AsyncEnumerable;
 
 namespace LocalPost;
 
-internal sealed class BackgroundQueueConsumer<T> : IBackgroundService
+internal sealed partial class BackgroundQueue<T>
 {
-    private readonly ILogger<BackgroundQueueConsumer<T>> _logger;
-    private readonly IServiceScopeFactory _scopeFactory;
-
-    private readonly IAsyncEnumerable<T> _reader;
-    private readonly IExecutor _executor;
-    private readonly HandlerFactory<T> _handlerFactory;
-
-    public BackgroundQueueConsumer(ILogger<BackgroundQueueConsumer<T>> logger, string name,
-        IServiceScopeFactory scopeFactory,
-        IExecutor executor,
-        IAsyncEnumerable<T> reader,
-        HandlerFactory<T> handlerFactory)
+    internal sealed class Consumer : IBackgroundService
     {
-        Name = name;
-        _logger = logger;
-        _scopeFactory = scopeFactory;
-        _reader = reader;
-        _executor = executor;
-        _handlerFactory = handlerFactory;
-    }
+        private readonly IAsyncEnumerable<T> _reader;
+        private readonly Handler<T> _handler;
 
-    public string Name { get; }
+        public Consumer(IAsyncEnumerable<T> reader, Handler<T> handler)
+        {
+            _reader = reader;
+            _handler = handler;
+        }
 
-    public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
+        public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
 
-    public async Task ExecuteAsync(CancellationToken ct)
-    {
-        try
+        public async Task ExecuteAsync(CancellationToken ct)
         {
             await foreach (var message in _reader.WithCancellation(ct))
-                await _executor.StartAsync(() => Process(message, ct), ct);
+                await _handler(message, ct);
         }
-        catch (ChannelClosedException e)
-        {
-            _logger.LogWarning(e, "{Name} queue has been closed, stop listening", Name);
 
-            // All currently running tasks will be processed in StopAsync() below
-        }
-    }
-
-    public async Task StopAsync(CancellationToken forceExitToken)
-    {
-        // Good to have later: an option to NOT process the rest of the messages
-        try
+        public async Task StopAsync(CancellationToken forceExitToken)
         {
-            // TODO An option to NOT process the rest of the messages...
+            // Good to have later: an option to NOT process the rest of the messages...
             await foreach (var message in _reader.WithCancellation(forceExitToken))
-                await _executor.StartAsync(() => Process(message, forceExitToken), forceExitToken);
+                await _handler(message, forceExitToken);
         }
-        catch (ChannelClosedException)
-        {
-            // OK, just wait for the rest of the tasks to finish
-        }
-
-        // Wait until all currently running tasks are finished
-        await _executor.WaitAsync(forceExitToken);
     }
 
-    private async Task Process(T message, CancellationToken ct)
+    internal sealed class BatchConsumer<TOut> : IBackgroundService
     {
-        // TODO Tracing...
+        private readonly ChannelReader<T> _source;
+        private readonly ChannelWriter<TOut> _destination;
+        private readonly BatchBuilderFactory<T, TOut> _factory;
 
-        using var scope = _scopeFactory.CreateScope();
+        private IBatchBuilder<T, TOut> _batch;
 
-        // Make it specific for this queue somehow?..
-        var handler = _handlerFactory(scope.ServiceProvider);
+        public BatchConsumer(ChannelReader<T> source, ChannelWriter<TOut> destination, BatchBuilderFactory<T, TOut> factory)
+        {
+            _source = source;
+            _destination = destination;
+            _factory = factory;
 
-        try
-        {
-            // Await the handler, to keep the container scope alive
-            await handler(message, ct);
+            _batch = factory();
         }
-        catch (OperationCanceledException e) when (e.CancellationToken == ct)
+
+        private async Task ProcessBatch(CancellationToken ct)
         {
-            throw;
+            await _destination.WriteAsync(_batch.Build(), ct);
+            _batch.Dispose();
+            _batch = _factory();
         }
-        catch (Exception e)
+
+        private async Task Process(CancellationToken ct)
         {
-            _logger.LogError(e, "{Queue}: unhandled exception while processing a message", Name);
+            while (true)
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct, _batch.TimeWindow);
+                try
+                {
+                    if (!await _source.WaitToReadAsync(cts.Token))
+                        break;
+
+                    while (_source.TryRead(out var message))
+                    {
+                        if (_batch.TryAdd(message)) continue;
+                        if (_batch.IsEmpty)
+                            throw new Exception("Cannot fit a message in a batch");
+
+                        await ProcessBatch(ct);
+
+                        if (!_batch.TryAdd(message))
+                            throw new Exception("Cannot fit a message in a batch");
+                    }
+                }
+                catch (OperationCanceledException e) when (e.CancellationToken == _batch.TimeWindow)
+                {
+                    // Just process the current batch
+                    if (!_batch.IsEmpty)
+                        await ProcessBatch(ct);
+                }
+            }
+
+            _destination.Complete();
         }
+
+        public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
+
+        public Task ExecuteAsync(CancellationToken ct) => Process(ct);
+
+        public Task StopAsync(CancellationToken forceExitToken) => Process(forceExitToken);
     }
 }

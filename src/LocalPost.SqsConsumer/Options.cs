@@ -1,8 +1,4 @@
-using System.Collections.Immutable;
 using System.ComponentModel.DataAnnotations;
-using Amazon.SQS;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace LocalPost.SqsConsumer;
 
@@ -17,7 +13,7 @@ public sealed record Options
     public const int DefaultTimeout = 30;
 
     /// <summary>
-    ///     How many messages to process in parallel.
+    ///     How many messages to process in parallel. Default is 10.
     /// </summary>
     [Required] public ushort MaxConcurrency { get; set; } = 10;
 
@@ -42,6 +38,7 @@ public sealed record Options
 
     /// <summary>
     ///     Time to wait for available messages in the queue. 0 is short pooling, where 1..20 activates long pooling.
+    ///     Default is 20.
     /// </summary>
     /// <see href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html">
     ///     Amazon SQS short and long polling
@@ -51,13 +48,21 @@ public sealed record Options
     /// </see>
     [Range(0, 20)] public byte WaitTimeSeconds { get; set; } = 20;
 
+    /// <summary>
+    ///     The maximum number of messages to return. Amazon SQS never returns more messages than this value (however,
+    ///     fewer messages might be returned). Valid values: 1 to 10. Default is 1.
+    /// </summary>
+    /// <see href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html">
+    ///     Amazon SQS short and long polling
+    /// </see>
+    /// <see href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/working-with-messages.html#setting-up-long-polling">
+    ///     Setting up long polling
+    /// </see>
     [Range(1, 10)] public byte MaxNumberOfMessages { get; set; } = 10;
 
-    [Range(1, uint.MaxValue)] public byte BufferSize { get; set; } = 1;
-
     /// <summary>
-    ///     Message processing timeout, in seconds. If not set, IAmazonSQS.GetQueueAttributesAsync() will be used once, to get
-    ///     VisibilityTimeout for the queue.
+    ///     Message processing timeout, in seconds. If not set, IAmazonSQS.GetQueueAttributesAsync() will be used once,
+    ///     to get VisibilityTimeout for the queue.
     /// </summary>
     /// <see href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html">
     ///     Amazon SQS visibility timeout

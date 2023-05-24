@@ -1,6 +1,6 @@
 using Nito.AsyncEx;
 
-namespace LocalPost;
+namespace LocalPost.AsyncEnumerable;
 
 internal delegate IBatchBuilder<T, TBatch> BatchBuilderFactory<in T, out TBatch>();
 
@@ -43,6 +43,9 @@ internal abstract class BatchBuilder<T, TBatch> : IBatchBuilder<T, TBatch>
 
 internal sealed class BoundedBatchBuilder<T> : BatchBuilder<T, IReadOnlyList<T>>
 {
+    public static BatchBuilderFactory<T, IReadOnlyList<T>> Factory(int maxSize, int timeWindow) =>
+        () => new BoundedBatchBuilder<T>(maxSize, TimeSpan.FromMilliseconds(timeWindow));
+
     private readonly int _max;
     private readonly List<T> _batch = new();
 

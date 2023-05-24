@@ -1,19 +1,75 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
-using LocalPost.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Nito.AsyncEx;
 using static Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult;
 
 namespace LocalPost;
 
-internal abstract class BackgroundServiceSupervisor : IHostedService, INamedService, IDisposable
+internal sealed record CombinedHostedService(ImmutableArray<IHostedService> Services) : IHostedService
 {
+    public CombinedHostedService(IHostedService s1, IHostedService s2) : this(new[] { s1, s2 })
+    {
+    }
+
+    public CombinedHostedService(IEnumerable<IHostedService> services) : this(services.ToImmutableArray())
+    {
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken) =>
+        Task.WhenAll(Services.Select(c => c.StartAsync(cancellationToken)));
+
+    public Task StopAsync(CancellationToken cancellationToken) =>
+        Task.WhenAll(Services.Select(c => c.StopAsync(cancellationToken)));
+
+}
+
+internal interface IBackgroundServiceSupervisor : IHostedService
+{
+    // With predefined static size
+    // (IAsyncDisposable later?..)
+    internal sealed record Combined(ImmutableArray<IBackgroundServiceSupervisor> Supervisors) :
+        IBackgroundServiceSupervisor, IDisposable
+    {
+        public Combined(IEnumerable<IBackgroundServiceSupervisor> supervisors) : this(supervisors.ToImmutableArray())
+        {
+        }
+
+        public Task StartAsync(CancellationToken cancellationToken) =>
+            Task.WhenAll(Supervisors.Select(c => c.StartAsync(cancellationToken)));
+
+        public Task StopAsync(CancellationToken cancellationToken) =>
+            Task.WhenAll(Supervisors.Select(c => c.StopAsync(cancellationToken)));
+
+        public bool Started => Supervisors.All(c => c.Started);
+        public bool Running => Supervisors.All(c => c.Running);
+        public bool Crashed => Supervisors.Any(c => c.Crashed);
+        public Exception? Exception => null; // TODO Implement
+
+        public void Dispose()
+        {
+            foreach (var consumer in Supervisors)
+                if (consumer is IDisposable disposable)
+                    disposable.Dispose();
+        }
+    }
+
+    public bool Started { get; }
+
+    public bool Running { get; }
+
+    [MemberNotNullWhen(true, nameof(Exception))]
+    public bool Crashed { get; }
+
+    public Exception? Exception { get; }
+
     public sealed class LivenessCheck : IHealthCheck
     {
-        private readonly BackgroundServiceSupervisor _supervisor;
+        private readonly IBackgroundServiceSupervisor _supervisor;
 
-        public LivenessCheck(BackgroundServiceSupervisor supervisor)
+        public LivenessCheck(IBackgroundServiceSupervisor supervisor)
         {
             _supervisor = supervisor;
         }
@@ -24,21 +80,21 @@ internal abstract class BackgroundServiceSupervisor : IHostedService, INamedServ
         private HealthCheckResult CheckHealth(HealthCheckContext _)
         {
             if (_supervisor.Crashed)
-                return Unhealthy($"{_supervisor.Name} has crashed", _supervisor.Exception);
+                return Unhealthy("Service has crashed", _supervisor.Exception);
 
             if (_supervisor is { Started: true, Running: false })
-                return Unhealthy($"{_supervisor.Name} is not running");
+                return Unhealthy("Service is not running");
 
             // Starting or running
-            return Healthy($"{_supervisor.Name} is alive");
+            return Healthy("Service is alive");
         }
     }
 
     public sealed class ReadinessCheck : IHealthCheck
     {
-        private readonly BackgroundServiceSupervisor _supervisor;
+        private readonly IBackgroundServiceSupervisor _supervisor;
 
-        public ReadinessCheck(BackgroundServiceSupervisor supervisor)
+        public ReadinessCheck(IBackgroundServiceSupervisor supervisor)
         {
             _supervisor = supervisor;
         }
@@ -49,33 +105,38 @@ internal abstract class BackgroundServiceSupervisor : IHostedService, INamedServ
         private HealthCheckResult CheckHealth(HealthCheckContext context)
         {
             if (!_supervisor.Started)
-                return Unhealthy($"{_supervisor.Name} has not been started yet", _supervisor.Exception);
+                return Unhealthy("Service has not been started yet", _supervisor.Exception);
 
             if (_supervisor.Crashed)
-                return Unhealthy($"{_supervisor.Name} has crashed", _supervisor.Exception);
+                return Unhealthy("Service has crashed", _supervisor.Exception);
 
-            return Healthy($"{_supervisor.Name} is running");
+            return Healthy("Service is running");
         }
     }
+}
 
+internal class BackgroundServiceSupervisor : IBackgroundServiceSupervisor, IDisposable
+{
     private readonly ILogger<BackgroundServiceSupervisor> _logger;
 
     private CancellationTokenSource? _executionCts;
     private Task? _execution;
 
-    public BackgroundServiceSupervisor(ILogger<BackgroundServiceSupervisor> logger, IBackgroundService service)
+    public BackgroundServiceSupervisor(ILogger<BackgroundServiceSupervisor> logger, string name,
+        IBackgroundService service)
     {
         _logger = logger;
+        Name = name;
         Service = service;
     }
 
-    public IBackgroundService Service { get; }
+    public string Name { get; }
 
-    public string Name => Service.Name;
+    public IBackgroundService Service { get; }
 
     public bool Started => _executionCts is not null && _execution is not null;
 
-    public bool Running => _execution is not null && _execution.IsCompleted;
+    public bool Running => _execution is not null && !_execution.IsCompleted;
 
     [MemberNotNullWhen(true, nameof(Exception))]
     public bool Crashed => Exception is not null;
@@ -96,14 +157,10 @@ internal abstract class BackgroundServiceSupervisor : IHostedService, INamedServ
             // Store the task we're executing
             _execution = ExecuteAsync(_executionCts.Token);
         }
-        catch (OperationCanceledException e) when (e.CancellationToken == ct)
-        {
-            _logger.LogInformation("{Name} start has been aborted", Name);
-        }
         catch (Exception e)
         {
             Exception = e;
-            _logger.LogCritical(e, "Unhandled exception while starting {Name} background queue", Name);
+            _logger.LogCritical(e, "Unhandled exception while starting {Name} service", Name);
         }
     }
 
@@ -116,17 +173,17 @@ internal abstract class BackgroundServiceSupervisor : IHostedService, INamedServ
         try
         {
             await Service.ExecuteAsync(stoppingToken);
-            _logger.LogInformation("{Name} background queue is completed", Name);
+            _logger.LogWarning("{Name} is done", Name);
         }
         catch (OperationCanceledException e) when (e.CancellationToken == stoppingToken)
         {
             // The rest of the queue will be processed in StopAsync() below
-            _logger.LogInformation("Application exit has been requested, stopping {Name} background queue...", Name);
+            _logger.LogInformation("Application exit has been requested, stopping {Name}...", Name);
         }
         catch (Exception e)
         {
             Exception = e;
-            _logger.LogCritical(e, "Unhandled exception in {Name} background queue", Name);
+            _logger.LogCritical(e, "{Name}: Unhandled exception", Name);
         }
     }
 
@@ -139,30 +196,32 @@ internal abstract class BackgroundServiceSupervisor : IHostedService, INamedServ
         }
         finally
         {
-            if (_execution is not null)
-                // Wait until the execution completes or the app is forced to exit
-                await Task.WhenAny(_execution, Task.Delay(Timeout.Infinite, forceExitToken));
+            // Wait until the execution completes or the app is forced to exit
+            _execution?.WaitAsync(forceExitToken);
         }
 
         await Service.StopAsync(forceExitToken);
+        _logger.LogInformation("{Name} has been stopped", Name);
     }
 
     public void Dispose()
     {
         _executionCts?.Cancel();
+        _executionCts?.Dispose();
         // ReSharper disable once SuspiciousTypeConversion.Global
         if (Service is IDisposable disposableService)
             disposableService.Dispose();
     }
 }
 
-internal sealed class BackgroundServiceSupervisor<T> : BackgroundServiceSupervisor
-    where T : class, IBackgroundService
-{
-    public BackgroundServiceSupervisor(ILogger<BackgroundServiceSupervisor<T>> logger, T service) : base(logger, service)
-    {
-        Service = service;
-    }
-
-    public new T Service { get; }
-}
+//internal sealed class BackgroundServiceSupervisor<T> : BackgroundServiceSupervisor
+//    where T : class, IBackgroundService, INamedService
+//{
+//    public BackgroundServiceSupervisor(ILogger<BackgroundServiceSupervisor<T>> logger, T service) :
+//        base(logger, service.Name, service)
+//    {
+//        Service = service;
+//    }
+//
+//    public new T Service { get; }
+//}

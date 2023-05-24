@@ -1,30 +1,22 @@
-using LocalPost.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace LocalPost;
 
-public sealed partial class BackgroundQueue<T>
+internal sealed partial class BackgroundQueue<T>
 {
-    // TODO Use
-    internal sealed class Supervisor : IHostedService, INamedService
+    internal sealed class Supervisor : IHostedService
     {
-        // TODO Health checks
+        // Health checks later?.. Like full or not.
 
-        public Supervisor(IBackgroundQueueManager<T> queue, string name)
+        private readonly IBackgroundQueueManager _queue;
+
+        public Supervisor(IBackgroundQueueManager queue)
         {
-            Queue = queue;
-            Name = name;
+            _queue = queue;
         }
-
-        internal IBackgroundQueueManager<T> Queue { get; }
-
-        public string Name { get; }
 
         public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
 
-        public async Task StopAsync(CancellationToken forceExitToken)
-        {
-            await Queue.CompleteAsync(forceExitToken);
-        }
+        public async Task StopAsync(CancellationToken forceExitToken) => await _queue.CompleteAsync(forceExitToken);
     }
 }

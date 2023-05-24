@@ -1,12 +1,14 @@
 using LocalPost.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace LocalPost.SqsConsumer.DependencyInjection;
 
 public static class ServiceRegistration
 {
+    // TODO Implement
 //    public static OptionsBuilder<ConsumerOptions> AddAmazonSqsJsonConsumer<THandler, T>(this IServiceCollection services,
 //        string name, Action<Consumer.Builder>? configure = null) where THandler : IHandler<T> =>
 //        services.AddAmazonSqsConsumer(name, builder =>
@@ -16,20 +18,21 @@ public static class ServiceRegistration
 //        });
 
     public static OptionsBuilder<Options> AddAmazonSqsConsumer<THandler>(this IServiceCollection services,
-        string name, Action<MessageSource.Builder>? configure = null) where THandler : IHandler<ConsumeContext> =>
+        string name, Action<MiddlewareStackBuilder<ConsumeContext>>? configure = null)
+        where THandler : IHandler<ConsumeContext> =>
         services.AddAmazonSqsConsumer(name, builder =>
         {
-            builder.MiddlewareStackBuilder.SetHandler<THandler>();
+            builder.SetHandler<THandler>();
             configure?.Invoke(builder);
         });
 
-    public static OptionsBuilder<Options> AddAmazonSqsConsumer(this IServiceCollection services,
-        string name, Handler<ConsumeContext> handler, Action<MessageSource.Builder>? configure = null) =>
-        services.AddAmazonSqsConsumer(name, builder =>
-        {
-            builder.MiddlewareStackBuilder.SetHandler(handler);
-            configure?.Invoke(builder);
-        });
+//    public static OptionsBuilder<Options> AddAmazonSqsConsumer(this IServiceCollection services,
+//        string name, Handler<ConsumeContext> handler, Action<MessageSource.Builder>? configure = null) =>
+//        services.AddAmazonSqsConsumer(name, builder =>
+//        {
+//            builder.MiddlewareStackBuilder.SetHandler(handler);
+//            configure?.Invoke(builder);
+//        });
 
 //    public static OptionsBuilder<ConsumerOptions> AddAmazonSqsMinimalConsumer<TDep1>(this IServiceCollection services,
 //        string name, Func<TDep1, Message, CancellationToken, Task> handler) where TDep1 : notnull =>
@@ -72,20 +75,20 @@ public static class ServiceRegistration
 //            .AddAmazonSqsConsumer(name, provider => provider.GetRequiredService<THandler>().Process);
 
     public static OptionsBuilder<Options> AddAmazonSqsConsumer(this IServiceCollection services,
-        string name, Action<MessageSource.Builder> configure)
+        string name, Action<MiddlewareStackBuilder<ConsumeContext>> configure)
     {
-        var builder = new MessageSource.Builder(name);
-        configure(builder);
-        services.AddHostedService(builder.Build);
+        var handleStackBuilder = new MiddlewareStackBuilder<ConsumeContext>();
+        services.TryAddSingleton<ProcessedMessageHandler>();
+        handleStackBuilder.Append<ProcessedMessageHandler>();
+        configure(handleStackBuilder);
+        var handlerStack = handleStackBuilder.Build();
 
-        services.TryAddSingleton<MessageSource.Middleware>();
+        services.TryAddSingleton(provider => SqsConsumerService.Create(provider, name, handlerStack));
 
-        services
-            .AddBackgroundQueueConsumer<ConsumeContext>(name, b => b
-                .SetReaderFactory(provider => provider.GetRequiredService<MessageSource.Service>(name).Messages)
-                .MiddlewareStackBuilder.SetHandler(builder.BuildHandlerFactory()))
-            .Configure<IOptionsMonitor<Options>>(
-                (options, consumerOptions) => { options.MaxConcurrency = consumerOptions.Get(name).MaxConcurrency; });
+        services.AddSingleton<IHostedService>(provider =>
+            provider.GetRequiredService<SqsConsumerService>(name).Supervisor);
+
+        // Extend ServiceDescriptor for better comparison and implement custom TryAddSingleton later...
 
         return services.AddOptions<Options>(name).Configure(options => options.QueueName = name);
     }

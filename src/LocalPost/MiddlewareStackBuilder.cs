@@ -34,7 +34,7 @@ public abstract class MiddlewareStackBuilder<T, TBuilder>
     public TBuilder Append(Middleware<T> middleware) =>
         Append(_ => middleware);
 
-    public TBuilder Append<TMiddleware>() where TMiddleware : IMiddleware<T>
+    public TBuilder Append<TMiddleware>() where TMiddleware : class, IMiddleware<T>
     {
         Middlewares.Add(provider => provider.GetRequiredService<TMiddleware>().Invoke);
 

@@ -3,14 +3,14 @@ using Microsoft.Extensions.Options;
 
 namespace LocalPost;
 
-public interface IBackgroundQueue<in T>
+public partial interface IBackgroundQueue<in T>
 {
     // TODO Custom exception when closed?.. Or just return true/false?..
     ValueTask Enqueue(T item, CancellationToken ct = default);
 }
 
 // TODO Open to public later
-internal interface IBackgroundQueueManager<in T>
+internal interface IBackgroundQueueManager
 {
     // Implement later for a better health check
 //    bool IsFull { get; }
@@ -41,26 +41,21 @@ public delegate Middleware<T> MiddlewareFactory<T>(IServiceProvider provider);
 
 
 
-public sealed partial class BackgroundQueue<T> : IBackgroundQueue<T>, IBackgroundQueueManager<T>, IAsyncEnumerable<T>
+internal sealed partial class BackgroundQueue<T> : IBackgroundQueue<T>, IBackgroundQueueManager, IAsyncEnumerable<T>
 {
     private readonly TimeSpan _completionTimeout;
 
-    // For the DI container
-    public BackgroundQueue(IOptions<BackgroundQueueOptions<T>> options) : this(options.Value.Queue)
-    {
-    }
-
-    public BackgroundQueue(QueueOptions options) : this(
+    public BackgroundQueue(BackgroundQueueOptions options) : this(
         options.MaxSize switch
         {
             not null => Channel.CreateBounded<T>(new BoundedChannelOptions(options.MaxSize.Value)
             {
-                SingleReader = true,
+                SingleReader = options.MaxConcurrency == 1,
                 SingleWriter = false,
             }),
             _ => Channel.CreateUnbounded<T>(new UnboundedChannelOptions
             {
-                SingleReader = true,
+                SingleReader = options.MaxConcurrency == 1,
                 SingleWriter = false,
             })
         },
@@ -74,18 +69,23 @@ public sealed partial class BackgroundQueue<T> : IBackgroundQueue<T>, IBackgroun
         Messages = messages;
     }
 
-    protected Channel<T> Messages { get; }
-
-    public bool IsClosed { get; private set; }
-
-    public ValueTask Enqueue(T item, CancellationToken ct = default) => Messages.Writer.WriteAsync(item, ct);
+    internal Channel<T> Messages { get; }
 
     public async IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken ct = default)
     {
+        // Track full or not later
         while (await Messages.Reader.WaitToReadAsync(ct))
             while (Messages.Reader.TryRead(out var item))
                 yield return item;
     }
+
+    public static implicit operator ChannelReader<T>(BackgroundQueue<T> that) => that.Messages.Reader;
+
+    public static implicit operator ChannelWriter<T>(BackgroundQueue<T> that) => that.Messages.Writer;
+
+    public ValueTask Enqueue(T item, CancellationToken ct = default) => Messages.Writer.WriteAsync(item, ct);
+
+    public bool IsClosed { get; private set; }
 
     public async ValueTask CompleteAsync(CancellationToken ct = default)
     {

@@ -1,4 +1,4 @@
-namespace LocalPost;
+namespace LocalPost.AsyncEnumerable;
 
 internal sealed class BatchingAsyncEnumerable<T, TOut> : IAsyncEnumerable<TOut>
 {
