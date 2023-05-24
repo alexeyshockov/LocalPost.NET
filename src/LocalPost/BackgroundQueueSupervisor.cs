@@ -1,10 +1,8 @@
-using Microsoft.Extensions.Hosting;
-
 namespace LocalPost;
 
 internal sealed partial class BackgroundQueue<T>
 {
-    internal sealed class Supervisor : IHostedService
+    internal sealed class Supervisor : IConcurrentHostedService
     {
         // Health checks later?.. Like full or not.
 

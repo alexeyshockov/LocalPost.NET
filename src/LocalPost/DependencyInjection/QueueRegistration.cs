@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace LocalPost.DependencyInjection;
@@ -27,6 +26,8 @@ public static class QueueRegistration
     public static OptionsBuilder<BackgroundQueueOptions<T>> AddBackgroundQueue<T>(this IServiceCollection services,
         Action<MiddlewareStackBuilder<T>> configure)
     {
+        services.TryAddConcurrentHostedServices();
+
         var handleStackBuilder = new MiddlewareStackBuilder<T>();
         configure(handleStackBuilder);
         var handlerStack = handleStackBuilder.Build();
@@ -35,8 +36,11 @@ public static class QueueRegistration
 
         services.TryAddSingleton<IBackgroundQueue<T>>(provider =>
             provider.GetRequiredService<BackgroundQueueService<T>>().Queue);
-        services.AddSingleton<IHostedService>(provider =>
-            provider.GetRequiredService<BackgroundQueueService<T>>().Supervisor);
+
+        services.AddSingleton<IConcurrentHostedService>(provider =>
+            provider.GetRequiredService<BackgroundQueueService<T>>().QueueSupervisor);
+        services.AddSingleton<IConcurrentHostedService>(provider =>
+            provider.GetRequiredService<BackgroundQueueService<T>>().ConsumerGroup);
 
         // Extend ServiceDescriptor for better comparison and implement custom TryAddSingleton later...
 

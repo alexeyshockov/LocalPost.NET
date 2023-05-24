@@ -15,66 +15,56 @@ internal sealed class SqsConsumerService : INamedService
 
         var client = ActivatorUtilities.CreateInstance<QueueClient>(provider, options);
         var messageSource = new MessageSource(client);
-        var queueSupervisor = ActivatorUtilities.CreateInstance<BackgroundServiceSupervisor>(provider, name, messageSource);
+        var reader = new BackgroundServiceSupervisor(messageSource);
 
         HandlerFactory<ConsumeContext> handlerFactory = handlerStack.Resolve;
         Handler<ConsumeContext> handler = ActivatorUtilities.CreateInstance<ScopedHandler<ConsumeContext>>(provider,
             name, handlerFactory).InvokeAsync;
 
-        var consumers = Enumerable.Range(1, options.MaxConcurrency)
-            .Select(_ =>
-            {
-                var consumer = new BackgroundQueue<ConsumeContext>.Consumer(messageSource, handler);
-                var supervisor = ActivatorUtilities.CreateInstance<BackgroundServiceSupervisor>(provider,
-                    name, consumer);
+        var consumer = new BackgroundQueue<ConsumeContext>.Consumer(messageSource, handler);
+        var consumerGroup = new ConsumerGroup(consumer.Run, options.MaxConcurrency);
 
-                return supervisor;
-            }).ToImmutableList();
-
-        return new SqsConsumerService(name, options, queueSupervisor, consumers);
+        return new SqsConsumerService(name, reader, consumerGroup);
     }
 
-    public SqsConsumerService(string name, Options options,
-        IBackgroundServiceSupervisor reader,
-        IEnumerable<IBackgroundServiceSupervisor> consumers)
+    public SqsConsumerService(string name, IBackgroundServiceSupervisor reader,
+        IBackgroundServiceSupervisor consumerGroup)
     {
         Name = name;
-        Options = options;
 
-        _queueReadinessCheck = new IBackgroundServiceSupervisor.ReadinessCheck(reader);
-        _queueLivenessCheck = new IBackgroundServiceSupervisor.LivenessCheck(reader);
+        Reader = reader;
+        _readerReadinessCheck = new IBackgroundServiceSupervisor.ReadinessCheck(reader);
+        _readerLivenessCheck = new IBackgroundServiceSupervisor.LivenessCheck(reader);
 
-        var consumerGroup = new IBackgroundServiceSupervisor.Combined(consumers);
+        ConsumerGroup = consumerGroup;
         _consumerGroupReadinessCheck = new IBackgroundServiceSupervisor.ReadinessCheck(consumerGroup);
         _consumerGroupLivenessCheck = new IBackgroundServiceSupervisor.LivenessCheck(consumerGroup);
-
-        Supervisor = new CombinedHostedService(reader, consumerGroup);
     }
 
     public string Name { get; }
 
-    public Options Options { get; }
-
     // Expose only the root supervisor to the host, to avoid deadlocks (.NET runtime handles background services
     // synchronously by default, so if consumers are stopped first, they will block the reader from completing the
     // channel).
-    public IHostedService Supervisor { get; }
+//    public IHostedService Supervisor { get; }
 
-    private readonly IHealthCheck _queueReadinessCheck;
-    private readonly IHealthCheck _queueLivenessCheck;
+    public IConcurrentHostedService Reader { get; }
+    private readonly IHealthCheck _readerReadinessCheck;
+    private readonly IHealthCheck _readerLivenessCheck;
 
+    public IConcurrentHostedService ConsumerGroup { get; }
     private readonly IHealthCheck _consumerGroupReadinessCheck;
     private readonly IHealthCheck _consumerGroupLivenessCheck;
 
     public static HealthCheckRegistration QueueReadinessCheck(string name, HealthStatus? failureStatus = default,
         IEnumerable<string>? tags = default) => new(name,
-        provider => provider.GetRequiredService<SqsConsumerService>(name)._queueReadinessCheck,
+        provider => provider.GetRequiredService<SqsConsumerService>(name)._readerReadinessCheck,
         failureStatus,
         tags);
 
     public static HealthCheckRegistration QueueLivenessCheck(string name, HealthStatus? failureStatus = default,
         IEnumerable<string>? tags = default) => new(name,
-        provider => provider.GetRequiredService<SqsConsumerService>(name)._queueLivenessCheck,
+        provider => provider.GetRequiredService<SqsConsumerService>(name)._readerLivenessCheck,
         failureStatus,
         tags);
 

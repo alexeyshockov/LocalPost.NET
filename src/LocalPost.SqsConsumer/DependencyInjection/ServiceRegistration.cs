@@ -77,6 +77,8 @@ public static class ServiceRegistration
     public static OptionsBuilder<Options> AddAmazonSqsConsumer(this IServiceCollection services,
         string name, Action<MiddlewareStackBuilder<ConsumeContext>> configure)
     {
+        services.TryAddConcurrentHostedServices();
+
         var handleStackBuilder = new MiddlewareStackBuilder<ConsumeContext>();
         services.TryAddSingleton<ProcessedMessageHandler>();
         handleStackBuilder.Append<ProcessedMessageHandler>();
@@ -85,8 +87,10 @@ public static class ServiceRegistration
 
         services.TryAddSingleton(provider => SqsConsumerService.Create(provider, name, handlerStack));
 
-        services.AddSingleton<IHostedService>(provider =>
-            provider.GetRequiredService<SqsConsumerService>(name).Supervisor);
+        services.AddSingleton<IConcurrentHostedService>(provider =>
+            provider.GetRequiredService<SqsConsumerService>(name).Reader);
+        services.AddSingleton<IConcurrentHostedService>(provider =>
+            provider.GetRequiredService<SqsConsumerService>(name).ConsumerGroup);
 
         // Extend ServiceDescriptor for better comparison and implement custom TryAddSingleton later...
 

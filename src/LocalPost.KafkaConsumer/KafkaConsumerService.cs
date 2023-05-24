@@ -21,68 +21,57 @@ internal sealed class KafkaConsumerService<TKey, TValue> : INamedService
         var kafkaClient = clientBuilder.Build();
         var messageSource = ActivatorUtilities.CreateInstance<MessageSource<TKey, TValue>>(provider,
             options.TopicName, kafkaClient);
-        var queueSupervisor = ActivatorUtilities.CreateInstance<BackgroundServiceSupervisor>(provider,
-            name, messageSource);
+        var reader = new BackgroundServiceSupervisor(messageSource);
 
         HandlerFactory<ConsumeContext<TKey, TValue>> handlerFactory = handlerStack.Resolve;
         Handler<ConsumeContext<TKey, TValue>> handler =
             ActivatorUtilities.CreateInstance<ScopedHandler<ConsumeContext<TKey, TValue>>>(provider,
                 name, handlerFactory).InvokeAsync;
 
-        var consumers = Enumerable.Range(1, options.MaxConcurrency)
-            .Select(_ =>
-            {
-                var consumer = new BackgroundQueue<ConsumeContext<TKey, TValue>>.Consumer(messageSource, handler);
-                var supervisor = ActivatorUtilities.CreateInstance<BackgroundServiceSupervisor>(provider,
-                    name, consumer);
+        var consumer = new BackgroundQueue<ConsumeContext<TKey, TValue>>.Consumer(messageSource, handler);
+        var consumerGroup = new ConsumerGroup(consumer.Run, options.MaxConcurrency);
 
-                return supervisor;
-            }).ToImmutableList();
-
-        return new KafkaConsumerService<TKey, TValue>(name, options, queueSupervisor, consumers);
+        return new KafkaConsumerService<TKey, TValue>(name, reader, consumerGroup);
     }
 
-    public KafkaConsumerService(string name, Options options,
-        IBackgroundServiceSupervisor reader,
-        IEnumerable<IBackgroundServiceSupervisor> consumers)
+    public KafkaConsumerService(string name, IBackgroundServiceSupervisor reader,
+        IBackgroundServiceSupervisor consumerGroup)
     {
         Name = name;
-        Options = options;
 
-        _queueReadinessCheck = new IBackgroundServiceSupervisor.ReadinessCheck(reader);
-        _queueLivenessCheck = new IBackgroundServiceSupervisor.LivenessCheck(reader);
+        Reader = reader;
+        _readerReadinessCheck = new IBackgroundServiceSupervisor.ReadinessCheck(reader);
+        _readerLivenessCheck = new IBackgroundServiceSupervisor.LivenessCheck(reader);
 
-        var consumerGroup= new IBackgroundServiceSupervisor.Combined(consumers);
+        ConsumerGroup = consumerGroup;
         _consumerGroupReadinessCheck = new IBackgroundServiceSupervisor.ReadinessCheck(consumerGroup);
         _consumerGroupLivenessCheck = new IBackgroundServiceSupervisor.LivenessCheck(consumerGroup);
-
-        Supervisor = new CombinedHostedService(reader, consumerGroup);
     }
 
     public string Name { get; }
 
-    public Options Options { get; }
-
     // Expose only the root supervisor to the host, to avoid deadlocks (.NET runtime handles background services
     // synchronously by default, so if consumers are stopped first, they will block the reader from completing the
     // channel).
-    public IHostedService Supervisor { get; }
+//    public IHostedService Supervisor { get; }
 
-    private readonly IHealthCheck _queueReadinessCheck;
-    private readonly IHealthCheck _queueLivenessCheck;
+    public IConcurrentHostedService Reader { get; }
+    private readonly IHealthCheck _readerReadinessCheck;
+    private readonly IHealthCheck _readerLivenessCheck;
 
+    public IConcurrentHostedService ConsumerGroup { get; }
     private readonly IHealthCheck _consumerGroupReadinessCheck;
     private readonly IHealthCheck _consumerGroupLivenessCheck;
 
     public static HealthCheckRegistration QueueReadinessCheck(string name, HealthStatus? failureStatus = default,
         IEnumerable<string>? tags = default) => new(name,
-        provider => provider.GetRequiredService<KafkaConsumerService<TKey, TValue>>(name)._queueReadinessCheck,
+        provider => provider.GetRequiredService<KafkaConsumerService<TKey, TValue>>(name)._readerReadinessCheck,
         failureStatus,
         tags);
 
     public static HealthCheckRegistration QueueLivenessCheck(string name, HealthStatus? failureStatus = default,
         IEnumerable<string>? tags = default) => new(name,
-        provider => provider.GetRequiredService<KafkaConsumerService<TKey, TValue>>(name)._queueLivenessCheck,
+        provider => provider.GetRequiredService<KafkaConsumerService<TKey, TValue>>(name)._readerLivenessCheck,
         failureStatus,
         tags);
 
