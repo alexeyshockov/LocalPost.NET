@@ -1,67 +1,73 @@
-using System.Threading.Channels;
+using System.Runtime.CompilerServices;
+using LocalPost.AsyncEnumerable;
+using LocalPost.DependencyInjection;
 
 namespace LocalPost.SqsConsumer;
 
-internal sealed class MessageSource : IBackgroundService, IAsyncEnumerable<ConsumeContext>
+internal sealed class MessageSource : MessageSourceBase, IAsyncEnumerable<ConsumeContext<string>>
+{
+    private readonly ConcurrentAsyncEnumerable<ConsumeContext<string>> _source;
+
+    public MessageSource(QueueClient client) : base(client)
+    {
+        _source = ConsumeAsync().ToConcurrent();
+    }
+
+    public override async Task ExecuteAsync(CancellationToken ct) => await _source.Run(ct);
+
+    public IAsyncEnumerator<ConsumeContext<string>> GetAsyncEnumerator(CancellationToken ct) =>
+        _source.GetAsyncEnumerator(ct);
+}
+
+internal sealed class BatchMessageSource : MessageSourceBase, IAsyncEnumerable<BatchConsumeContext<string>>
+{
+    private readonly ConcurrentAsyncEnumerable<BatchConsumeContext<string>> _source;
+
+    public BatchMessageSource(QueueClient client,
+        BatchBuilderFactory<ConsumeContext<string>, BatchConsumeContext<string>> factory) : base(client)
+    {
+        _source = ConsumeAsync().Batch(factory).ToConcurrent();
+    }
+
+    public override async Task ExecuteAsync(CancellationToken ct) => await _source.Run(ct);
+
+    public IAsyncEnumerator<BatchConsumeContext<string>> GetAsyncEnumerator(CancellationToken ct) =>
+        _source.GetAsyncEnumerator(ct);
+}
+
+internal abstract class MessageSourceBase : IBackgroundService, INamedService
 {
     private readonly QueueClient _client;
-    private readonly Channel<ConsumeContext> _queue;
 
-    public MessageSource(QueueClient client)
+    private bool _stopped;
+
+    protected MessageSourceBase(QueueClient client)
     {
         _client = client;
-        _queue = Channel.CreateBounded<ConsumeContext>(new BoundedChannelOptions(1)
-        {
-            SingleWriter = true, // Spawn multiple readers later?..
-            SingleReader = false
-        });
     }
 
-    public async IAsyncEnumerator<ConsumeContext> GetAsyncEnumerator(CancellationToken ct = default)
+    public string Name => _client.Name;
+
+    public async Task StartAsync(CancellationToken ct) => await _client.ConnectAsync(ct);
+
+    public abstract Task ExecuteAsync(CancellationToken ct);
+
+    protected async IAsyncEnumerable<ConsumeContext<string>> ConsumeAsync(
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
-        // Track full or not later
-        while (await _queue.Reader.WaitToReadAsync(ct))
-            while (_queue.Reader.TryRead(out var item))
-                yield return item;
+        while (!ct.IsCancellationRequested && !_stopped)
+            foreach (var message in await _client.PullMessagesAsync(ct))
+                yield return message;
+
+        ct.ThrowIfCancellationRequested();
     }
 
-    public static implicit operator ChannelReader<ConsumeContext>(MessageSource that) => that._queue.Reader;
-
-    public static implicit operator ChannelWriter<ConsumeContext>(MessageSource that) => that._queue.Writer;
-
-    public async Task StartAsync(CancellationToken ct)
-    {
-        await _client.ConnectAsync(ct);
-    }
-
-    public async Task ExecuteAsync(CancellationToken ct)
-    {
-        try
-        {
-            while (!ct.IsCancellationRequested)
-            {
-                await _queue.Writer.WaitToWriteAsync(ct); // Wait for the buffer capacity
-
-                await Consume(ct);
-            }
-        }
-        finally
-        {
-        }
-    }
-
+    // Run on a separate thread, as Confluent Kafka API is blocking
     public Task StopAsync(CancellationToken ct)
     {
-        _queue.Writer.Complete();
+        _stopped = true;
+//        _client.Close();
 
         return Task.CompletedTask;
-    }
-
-    private async Task Consume(CancellationToken stoppingToken)
-    {
-        var messages = await _client.PullMessagesAsync(stoppingToken);
-
-        foreach (var message in messages)
-            await _queue.Writer.WriteAsync(message, stoppingToken);
     }
 }

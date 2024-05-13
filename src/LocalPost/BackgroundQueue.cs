@@ -1,100 +1,116 @@
 using System.Threading.Channels;
-using Microsoft.Extensions.Options;
+using JetBrains.Annotations;
+using LocalPost.AsyncEnumerable;
 
 namespace LocalPost;
 
-public partial interface IBackgroundQueue<in T>
+[PublicAPI]
+public interface IBackgroundQueue<in T>
 {
     // TODO Custom exception when closed?.. Or just return true/false?..
     ValueTask Enqueue(T item, CancellationToken ct = default);
 }
 
-// TODO Open to public later
-internal interface IBackgroundQueueManager
+internal static partial class BackgroundQueue
 {
-    // Implement later for a better health check
-//    bool IsFull { get; }
+    public static BackgroundQueue<T, T> Create<T>(BackgroundQueueOptions options) =>
+        Create<T, T>(options, reader => reader.ReadAllAsync());
 
-    bool IsClosed { get; }
+    public static BackgroundQueue<T, IReadOnlyList<T>> CreateBatched<T>(BatchedBackgroundQueueOptions options) =>
+        Create<T, IReadOnlyList<T>>(options,
+            reader => reader
+                .ReadAllAsync()
+                .Batch(ct => new BoundedBatchBuilder<T>(options.BatchMaxSize, options.BatchTimeWindow, ct)),
+            true);
 
-    ValueTask CompleteAsync(CancellationToken ct = default);
-}
-
-public interface IHandler<in TOut>
-{
-    Task InvokeAsync(TOut payload, CancellationToken ct);
-}
-
-public interface IMiddleware<T>
-{
-    Handler<T> Invoke(Handler<T> next);
-}
-
-public delegate Task Handler<in T>(T context, CancellationToken ct);
-
-public delegate Handler<T> HandlerFactory<in T>(IServiceProvider provider);
-
-public delegate Handler<T> Middleware<T>(Handler<T> next);
-//public delegate Task Middleware<T>(T context, Handler<T> next, CancellationToken ct);
-
-public delegate Middleware<T> MiddlewareFactory<T>(IServiceProvider provider);
-
-
-
-internal sealed partial class BackgroundQueue<T> : IBackgroundQueue<T>, IBackgroundQueueManager, IAsyncEnumerable<T>
-{
-    private readonly TimeSpan _completionTimeout;
-
-    public BackgroundQueue(BackgroundQueueOptions options) : this(
-        options.MaxSize switch
+    // To make the pipeline linear (single consumer), just add .ToConcurrent() to the end
+    public static BackgroundQueue<T, TOut> Create<T, TOut>(BackgroundQueueOptions options,
+        Func<ChannelReader<T>, IAsyncEnumerable<TOut>> configure,
+        bool proxy = false) // TODO Rename this parameter somehow...
+    {
+        var channel = options.MaxSize switch
         {
             not null => Channel.CreateBounded<T>(new BoundedChannelOptions(options.MaxSize.Value)
             {
-                SingleReader = options.MaxConcurrency == 1,
-                SingleWriter = false,
+                SingleReader = proxy || options.MaxConcurrency == 1,
+                SingleWriter = false, // We do not know how it will be used
+                FullMode = options.FullMode,
             }),
             _ => Channel.CreateUnbounded<T>(new UnboundedChannelOptions
             {
-                SingleReader = options.MaxConcurrency == 1,
-                SingleWriter = false,
+                SingleReader = proxy || options.MaxConcurrency == 1,
+                SingleWriter = false, // We do not know how it will be used
             })
-        },
-        TimeSpan.FromMilliseconds(options.CompletionTimeout ?? 0))
-    {
-    }
+        };
 
-    public BackgroundQueue(Channel<T> messages, TimeSpan completionTimeout)
+        var pipeline = configure(channel.Reader);
+        if (proxy)
+            pipeline = pipeline.ToConcurrent();
+
+        return new BackgroundQueue<T, TOut>(channel, pipeline,
+            TimeSpan.FromMilliseconds(options.CompletionTimeout ?? 0));
+    }
+}
+
+internal static partial class BackgroundQueue<T>
+{
+    public static readonly string Name = "BackgroundQueue/" + Reflection.FriendlyNameOf<T>();
+}
+
+internal sealed class BackgroundQueue<T, TOut> : IBackgroundQueue<T>, IAsyncEnumerable<TOut>,
+    IBackgroundService
+{
+    private readonly TimeSpan _completionTimeout;
+    private readonly ChannelWriter<T> _messages;
+    private readonly IAsyncEnumerable<TOut> _pipeline;
+
+    public BackgroundQueue(ChannelWriter<T> input, IAsyncEnumerable<TOut> pipeline, TimeSpan completionTimeout)
     {
         _completionTimeout = completionTimeout;
-        Messages = messages;
+        _messages = input;
+        _pipeline = pipeline;
     }
 
-    internal Channel<T> Messages { get; }
+    public IAsyncEnumerator<TOut> GetAsyncEnumerator(CancellationToken ct) => _pipeline.GetAsyncEnumerator(ct);
 
-    public async IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken ct = default)
-    {
-        // Track full or not later
-        while (await Messages.Reader.WaitToReadAsync(ct))
-            while (Messages.Reader.TryRead(out var item))
-                yield return item;
-    }
+    // Track full or not later
+    public ValueTask Enqueue(T item, CancellationToken ct = default) => _messages.WriteAsync(item, ct);
 
-    public static implicit operator ChannelReader<T>(BackgroundQueue<T> that) => that.Messages.Reader;
+    public bool IsClosed { get; private set; } // TODO Use
 
-    public static implicit operator ChannelWriter<T>(BackgroundQueue<T> that) => that.Messages.Writer;
-
-    public ValueTask Enqueue(T item, CancellationToken ct = default) => Messages.Writer.WriteAsync(item, ct);
-
-    public bool IsClosed { get; private set; }
-
-    public async ValueTask CompleteAsync(CancellationToken ct = default)
+    private async ValueTask CompleteAsync(CancellationToken ct = default)
     {
         if (IsClosed)
             return;
 
         await Task.Delay(_completionTimeout, ct);
 
-        Messages.Writer.Complete(); // TODO Handle exceptions
+        _messages.Complete();
         IsClosed = true;
     }
+
+    public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
+
+    public Task ExecuteAsync(CancellationToken ct) => _pipeline switch
+    {
+        ConcurrentAsyncEnumerable<TOut> concurrent => concurrent.Run(ct),
+        _ => Task.CompletedTask
+    };
+
+    public async Task StopAsync(CancellationToken forceExitToken) => await CompleteAsync(forceExitToken);
 }
+
+
+
+
+
+//// Open to public later?..
+//internal interface IBackgroundQueueManager
+//{
+//    // Implement later for a better health check?..
+////    bool IsFull { get; }
+//
+//    bool IsClosed { get; }
+//
+//    ValueTask CompleteAsync(CancellationToken ct = default);
+//}

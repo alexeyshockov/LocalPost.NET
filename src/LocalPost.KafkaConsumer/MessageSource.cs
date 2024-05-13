@@ -1,104 +1,86 @@
-using System.Threading.Channels;
-using Confluent.Kafka;
-using Microsoft.Extensions.Logging;
+using System.Runtime.CompilerServices;
+using LocalPost.AsyncEnumerable;
+using LocalPost.DependencyInjection;
 
 namespace LocalPost.KafkaConsumer;
 
-internal sealed class MessageSource<TKey, TValue> : IBackgroundService,
-    IAsyncEnumerable<ConsumeContext<TKey, TValue>>, IDisposable
+internal sealed class MessageSource : MessageSourceBase, IAsyncEnumerable<ConsumeContext<byte[]>>
 {
-    private readonly ILogger<MessageSource<TKey, TValue>> _logger;
-    private readonly string _topicName;
+    private readonly ConcurrentAsyncEnumerable<ConsumeContext<byte[]>> _source;
 
-    private readonly IConsumer<TKey, TValue> _kafka;
-    private readonly Channel<ConsumeContext<TKey, TValue>> _queue;
-
-    public MessageSource(ILogger<MessageSource<TKey, TValue>> logger, string topicName, IConsumer<TKey, TValue> kafka)
+    public MessageSource(KafkaTopicClient client) : base(client)
     {
-        _logger = logger;
-        _topicName = topicName;
-        _kafka = kafka;
-        _queue = Channel.CreateBounded<ConsumeContext<TKey, TValue>>(new BoundedChannelOptions(1)
-        {
-            SingleWriter = true,
-            SingleReader = false
-        });
+        _source = ConsumeAsync().ToConcurrent();
     }
 
-    public async IAsyncEnumerator<ConsumeContext<TKey, TValue>> GetAsyncEnumerator(CancellationToken ct = default)
+    public override async Task ExecuteAsync(CancellationToken ct) => await _source.Run(ct);
+
+    public IAsyncEnumerator<ConsumeContext<byte[]>> GetAsyncEnumerator(CancellationToken ct) =>
+        _source.GetAsyncEnumerator(ct);
+}
+
+internal sealed class BatchMessageSource : MessageSourceBase, IAsyncEnumerable<BatchConsumeContext<byte[]>>
+{
+    private readonly ConcurrentAsyncEnumerable<BatchConsumeContext<byte[]>> _source;
+
+    public BatchMessageSource(KafkaTopicClient client,
+        BatchBuilderFactory<ConsumeContext<byte[]>, BatchConsumeContext<byte[]>> factory) : base(client)
     {
-        // Track full or not later
-        while (await _queue.Reader.WaitToReadAsync(ct))
-            while (_queue.Reader.TryRead(out var item))
-                yield return item;
+        _source = ConsumeAsync().Batch(factory).ToConcurrent();
     }
 
-    public static implicit operator ChannelReader<ConsumeContext<TKey, TValue>>(MessageSource<TKey, TValue> that) =>
-        that._queue.Reader;
+    public override async Task ExecuteAsync(CancellationToken ct) => await _source.Run(ct);
 
-    public static implicit operator ChannelWriter<ConsumeContext<TKey, TValue>>(MessageSource<TKey, TValue> that) =>
-        that._queue.Writer;
+    public IAsyncEnumerator<BatchConsumeContext<byte[]>> GetAsyncEnumerator(CancellationToken ct) =>
+        _source.GetAsyncEnumerator(ct);
+}
 
-    public Task StartAsync(CancellationToken ct) => Task.Run(() => _kafka.Subscribe(_topicName), ct);
+internal abstract class MessageSourceBase : IBackgroundService, INamedService
+{
+    private readonly KafkaTopicClient _client;
 
-    public Task ExecuteAsync(CancellationToken ct) => Task.Run(() => Run(ct), ct);
+    private bool _stopped;
 
-    private async Task Run(CancellationToken stoppingToken = default)
+    // Some additional reading: https://devblogs.microsoft.com/premier-developer/the-danger-of-taskcompletionsourcet-class/
+//    private readonly TaskCompletionSource<bool> _executionTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    protected MessageSourceBase(KafkaTopicClient client)
     {
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            await Task.Yield();
-
-            try
-            {
-                await _queue.Writer.WaitToWriteAsync(stoppingToken); // Wait for the buffer capacity
-
-                await Consume(stoppingToken);
-            }
-            catch (OperationCanceledException e) when (e.CancellationToken == stoppingToken)
-            {
-                // Just complete the method normally...
-            }
-        }
+        _client = client;
     }
 
-    private async Task Consume(CancellationToken stoppingToken)
+    public string Name => _client.Name;
+
+    // Run on a separate thread, as Confluent Kafka API is blocking
+    public Task StartAsync(CancellationToken ct) => Task.Run(() => _client.Subscribe(), ct);
+
+    public abstract Task ExecuteAsync(CancellationToken ct);
+
+    protected async IAsyncEnumerable<ConsumeContext<byte[]>> ConsumeAsync(
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
         // TODO Transaction activity...
-        try
-        {
-            var consumeResult = _kafka.Consume(stoppingToken);
 
-            if (consumeResult is null || consumeResult.IsPartitionEOF || consumeResult.Message is null)
-                return; // Continue the loop
-
-            await _queue.Writer.WriteAsync(new ConsumeContext<TKey, TValue>
-            {
-//                    Client = _kafka,
-                Result = consumeResult,
-            }, stoppingToken);
-        }
-        catch (ConsumeException e)
-        {
-            _logger.LogError(e, "Kafka {Topic} consumer error, help link: {HelpLink}",
-                _topicName, e.HelpLink);
-
-            // Bubble up, so the supervisor can report the error and the whole app can be restarted (by Kubernetes or
-            // another orchestrator)
-            throw;
-        }
+        // Give the control back in the beginning, just before blocking in the Kafka's consumer call
+        await Task.Yield();
+        foreach (var result in Consume(ct))
+            yield return result;
     }
 
+    private IEnumerable<ConsumeContext<byte[]>> Consume(CancellationToken ct)
+    {
+        // TODO Transaction activity...
+
+        while (!ct.IsCancellationRequested && !_stopped)
+            yield return _client.Read(ct);
+
+        ct.ThrowIfCancellationRequested();
+    }
+
+    // Run on a separate thread, as Confluent Kafka API is blocking
     public Task StopAsync(CancellationToken ct) => Task.Run(() =>
     {
-        _logger.LogInformation("Stopping Kafka {Topic} consumer...", _topicName);
-
-        _kafka.Close();
-        _queue.Writer.Complete();
+        _stopped = true;
+        _client.Close();
     }, ct);
-
-    public void Dispose()
-    {
-        _kafka.Dispose();
-    }
 }

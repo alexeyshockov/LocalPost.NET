@@ -1,36 +1,42 @@
-using System.Diagnostics;
 using Amazon.SQS;
 using Amazon.SQS.Model;
+using LocalPost.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace LocalPost.SqsConsumer;
 
-internal sealed class QueueClient
+internal sealed class QueueClient : INamedService
 {
-    // TODO Add more details
-    // See https://github.com/npgsql/npgsql/blob/main/src/Npgsql/NpgsqlActivitySource.cs#LL61C31-L61C49
-    // See https://github.com/npgsql/npgsql/blob/main/src/Npgsql/NpgsqlCommand.cs#L1639-L1644
-    private static readonly ActivitySource Tracer = new(typeof(QueueClient).Namespace);
-
     private readonly ILogger<QueueClient> _logger;
+
     private readonly IAmazonSQS _sqs;
     private readonly Options _options;
 
-    public QueueClient(ILogger<QueueClient> logger, Options options, IAmazonSQS sqs)
+    public QueueClient(ILogger<QueueClient> logger, IAmazonSQS sqs, IOptionsMonitor<Options> options, string name) :
+        this(logger, sqs, options.Get(name), name)
+    {
+    }
+
+    public QueueClient(ILogger<QueueClient> logger, IAmazonSQS sqs, Options options, string name)
     {
         _logger = logger;
         _sqs = sqs;
         _options = options;
+        Name = name;
     }
+
+    public string Name { get; }
+
+    public string QueueName => _options.QueueName;
 
     private GetQueueAttributesResponse? _queueAttributes;
 
     // TODO Use
-    public int MessageVisibilityTimeout => _queueAttributes?.VisibilityTimeout switch
+    public TimeSpan? MessageVisibilityTimeout => _queueAttributes?.VisibilityTimeout switch
     {
-        > 0 => _queueAttributes.VisibilityTimeout,
-        _ => _options.Timeout
+        > 0 => TimeSpan.FromSeconds(_queueAttributes.VisibilityTimeout),
+        _ => null
     };
 
     private string? _queueUrl;
@@ -50,7 +56,7 @@ internal sealed class QueueClient
         try
         {
             // Checking for a possible error in the response would be also good...
-            _queueAttributes = await _sqs.GetQueueAttributesAsync(QueueUrl, Options.AllAttributes, ct);
+            _queueAttributes = await _sqs.GetQueueAttributesAsync(QueueUrl, EndpointOptions.AllAttributes, ct);
         }
         catch (OperationCanceledException e) when (e.CancellationToken == ct)
         {
@@ -62,51 +68,56 @@ internal sealed class QueueClient
         }
     }
 
-    public async Task DeleteMessageAsync(Message message, CancellationToken ct)
+    public async Task<IEnumerable<ConsumeContext<string>>> PullMessagesAsync(CancellationToken ct)
     {
-        using var span = Tracer.StartActivity();
+        using var activity = SqsActivitySource.StartReceiving(this);
 
-        var response = await _sqs.DeleteMessageAsync(QueueUrl, message.ReceiptHandle, ct);
+        var attributeNames = EndpointOptions.AllAttributes; // Make configurable, later
+        var messageAttributeNames = EndpointOptions.AllMessageAttributes; // Make configurable, later
+
+        // AWS SDK handles network failures, see
+        // https://docs.aws.amazon.com/sdkref/latest/guide/feature-retry-behavior.html
+        var response = await _sqs.ReceiveMessageAsync(new ReceiveMessageRequest
+        {
+            QueueUrl = QueueUrl,
+            WaitTimeSeconds = _options.WaitTimeSeconds,
+            MaxNumberOfMessages = _options.MaxNumberOfMessages,
+            AttributeNames = attributeNames,
+            MessageAttributeNames = messageAttributeNames,
+        }, ct);
+
+        activity?.SetTagsFor(response);
+
+        return response.Messages.Select(message => new ConsumeContext<string>(this, message, message.Body));
+
+        // TODO Log failures?..
+
+//        catch (OverLimitException)
+//        {
+//            // Log and try again?..
+//        }
+    }
+
+    public async Task DeleteMessageAsync<T>(ConsumeContext<T> context)
+    {
+        using var activity = SqsActivitySource.StartSettling(context);
+        await _sqs.DeleteMessageAsync(QueueUrl, context.ReceiptHandle);
 
         // TODO Log failures?..
     }
 
-    public async Task<IEnumerable<ConsumeContext>> PullMessagesAsync(CancellationToken ct)
+    public async Task DeleteMessagesAsync<T>(BatchConsumeContext<T> context)
     {
-        using var span = Tracer.StartActivity();
+        using var activity = SqsActivitySource.StartSettling(context);
 
-        var attributeNames = Options.AllAttributes; // TODO Configurable
-        var messageAttributeNames = Options.AllMessageAttributes; // TODO Configurable
+        var requests = context.Messages
+            .Select((message, i) => new DeleteMessageBatchRequestEntry(i.ToString(), message.ReceiptHandle))
+            .Chunk(10)
+            .Select(entries => entries.ToList());
 
-        try
-        {
-            // AWS SDK handles network failures, see
-            // https://docs.aws.amazon.com/sdkref/latest/guide/feature-retry-behavior.html
-            var response = await _sqs.ReceiveMessageAsync(new ReceiveMessageRequest
-            {
-                QueueUrl = QueueUrl,
-                WaitTimeSeconds = _options.WaitTimeSeconds,
-                MaxNumberOfMessages = _options.MaxNumberOfMessages,
-                AttributeNames = attributeNames,
-                MessageAttributeNames = messageAttributeNames,
-            }, ct);
+        await Task.WhenAll(requests.Select(entries =>
+            _sqs.DeleteMessageBatchAsync(QueueUrl, entries)));
 
-            // TODO Add number of received messages to the diagnostics span
-            return response.Messages
-                .Select(message => new ConsumeContext(_options.QueueName, QueueUrl, message)).ToArray();
-        }
-//        catch (OverLimitException)
-//        {
-//            // TODO Handle
-//        }
-        catch (OperationCanceledException e) when (e.CancellationToken == ct)
-        {
-            throw;
-        }
-        catch (Exception)
-        {
-            // Just bubble up, so the supervisor can report the error and the whole app can be restarted (Kubernetes)
-            throw;
-        }
+        // TODO Log failures?..
     }
 }

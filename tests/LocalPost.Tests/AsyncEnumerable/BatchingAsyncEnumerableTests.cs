@@ -1,8 +1,9 @@
 using System.Threading.Channels;
 using FluentAssertions;
 using LocalPost.AsyncEnumerable;
+using Nito.AsyncEx;
 
-namespace LocalPost.Tests;
+namespace LocalPost.Tests.AsyncEnumerable;
 
 public class BatchingAsyncEnumerableTests
 {
@@ -15,7 +16,7 @@ public class BatchingAsyncEnumerableTests
             SingleWriter = false
         });
         var results = source.Reader.ReadAllAsync().Batch(
-            () => new BoundedBatchBuilder<int>(10, TimeSpan.FromSeconds(2)));
+            (ct) => new BoundedBatchBuilder<int>(10, TimeSpan.FromSeconds(2)));
 
         async Task Produce()
         {

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>net6;net8</TargetFrameworks>
+        <ImplicitUsings>enable</ImplicitUsings>
+
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="AutoFixture.AutoNSubstitute" Version="4.*" />
+        <PackageReference Include="AutoFixture.Xunit2" Version="4.*" />
+        <PackageReference Include="FluentAssertions" Version="6.*" />
+        <PackageReference Include="NSubstitute" Version="5.*" />
+        <PackageReference Include="NSubstitute.Analyzers.CSharp" Version="1.*" />
+
+        <PackageReference Include="Testcontainers.Kafka" Version="3.*" />
+
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.1.*" />
+        <PackageReference Include="xunit" Version="2.4.*" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="2.4.*" PrivateAssets="All" />
+        <PackageReference Include="coverlet.collector" Version="3.1.*" PrivateAssets="All" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\LocalPost.KafkaConsumer\LocalPost.KafkaConsumer.csproj" />
+    </ItemGroup>
+
+</Project>

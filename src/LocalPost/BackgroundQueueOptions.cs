@@ -3,16 +3,42 @@ using System.Threading.Channels;
 
 namespace LocalPost;
 
+// For the DI container and, to distinguish between different queues
+public sealed record BackgroundQueueOptions<T> : BackgroundQueueOptions;
+
+// For the DI container and, to distinguish between different queues
+public sealed record BatchedBackgroundQueueOptions<T> : BatchedBackgroundQueueOptions;
+
+public record BatchedBackgroundQueueOptions : BackgroundQueueOptions
+{
+    [Range(1, ushort.MaxValue)]
+    public ushort BatchMaxSize { get; set; } = 10;
+
+    [Range(1, ushort.MaxValue)]
+    public int BatchTimeWindowMilliseconds { get; set; } = 1_000;
+
+    internal TimeSpan BatchTimeWindow => TimeSpan.FromMilliseconds(BatchTimeWindowMilliseconds);
+}
+
 /// <summary>
 ///     Background queue configuration.
 /// </summary>
 public record BackgroundQueueOptions
 {
-    // TODO Use
+    /// <summary>
+    ///     How to handle new messages when the queue (channel) is full. Default is to drop the oldest message (to not
+    ///     block the producer).
+    /// </summary>
     public BoundedChannelFullMode FullMode { get; set; } = BoundedChannelFullMode.DropOldest;
 
+    /// <summary>
+    ///     Maximum queue (channel) length, after which writes are blocked. Default is unlimited.
+    /// </summary>
     public ushort? MaxSize { get; set; } = null;
 
+    /// <summary>
+    ///     How long to wait before closing the queue (channel) on app shutdown. Default is 1 second.
+    /// </summary>
     public ushort? CompletionTimeout { get; set; } = 1_000; // Milliseconds
 
     /// <summary>

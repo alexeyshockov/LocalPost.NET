@@ -1,186 +1,116 @@
-using System.Collections.Immutable;
-using System.Threading.Channels;
-using LocalPost.AsyncEnumerable;
+using LocalPost.DependencyInjection;
 
 namespace LocalPost;
 
-internal sealed class ConsumerSupervisor : IBackgroundServiceSupervisor
+//    public async Task StopAsync(CancellationToken forceExitToken)
+//    {
+//        // Do not cancel the execution immediately, as it will finish gracefully itself (when the channel is closed)
+//
+//        // TODO .NET 6 async...
+//        using var linked = forceExitToken.Register(() => _executionCts?.Cancel());
+//
+//        if (_execution is not null)
+//            await _execution;
+//    }
+
+
+
+internal static partial class BackgroundQueue
 {
-    private CancellationTokenSource? _executionCts;
-    private Task? _execution;
+//    public static BackgroundQueue<T>.Consumer ConsumerFor<T>(IAsyncEnumerable<T> reader, Handler<T> handler) =>
+//        new(reader, handler);
 
-    private readonly Func<CancellationToken, Task> _consumer;
+//    public static IBackgroundServiceSupervisor ConsumerSupervisorFor<T>(BackgroundQueue<T>.Consumer consumer) =>
+//        new BackgroundServiceSupervisor(consumer);
 
-    public ConsumerSupervisor(Func<CancellationToken, Task> consumer)
+    public static ConsumerGroup<TQ, T> ConsumerGroupFor<T, TQ>(TQ queue, Handler<T> handler, int maxConcurrency)
+        where TQ : IAsyncEnumerable<T> => new(Consumer.Loop(queue, handler), maxConcurrency);
+
+    public static ConsumerGroup<TQ, T> ConsumerGroupOverDisposablesFor<T, TQ>(TQ queue, Handler<T> handler, int maxConcurrency)
+        where TQ : IAsyncEnumerable<T>
+        where T : IDisposable => new(Consumer.LoopOverDisposables(queue, handler), maxConcurrency);
+
+    public static NamedConsumerGroup<TQ, T> ConsumerGroupForNamed<T, TQ>(TQ queue, Handler<T> handler, int maxConcurrency)
+        where TQ : IAsyncEnumerable<T>, INamedService => new(queue, Consumer.Loop(queue, handler), maxConcurrency);
+
+    public static NamedConsumerGroup<TQ, T> ConsumerGroupOverDisposablesForNamed<T, TQ>(TQ queue, Handler<T> handler, int maxConcurrency)
+        where TQ : IAsyncEnumerable<T>, INamedService
+        where T : IDisposable => new(queue, Consumer.Loop(queue, handler), maxConcurrency);
+
+    internal class NamedConsumerGroup<TQ, T> : ConsumerGroupBase<T>, INamedService
+        where TQ : IAsyncEnumerable<T>, INamedService
     {
-        _consumer = consumer;
+        public NamedConsumerGroup(TQ queue, Func<CancellationToken, Task> loop, int maxConcurrency) :
+            base(loop, maxConcurrency)
+        {
+            Name = queue.Name;
+        }
+
+        public string Name { get; }
     }
 
-    public bool Started => _executionCts is not null && _execution is not null;
-
-    public bool Running => _execution is not null && !_execution.IsCompleted;
-
-    public bool Crashed => Exception is not null;
-
-    public Exception? Exception { get; private set; }
-
-    public Task StartAsync(CancellationToken ct)
+    // Parametrized class, to be used with the Dependency Injection container
+    internal class ConsumerGroup<TQ, T> : ConsumerGroupBase<T> where TQ : IAsyncEnumerable<T>
     {
-        if (_executionCts is not null)
-            throw new InvalidOperationException("Execution has been already started");
-
-        _executionCts = new CancellationTokenSource();
-        _execution = ExecuteAsync(_executionCts.Token);
-
-        return Task.CompletedTask;
-    }
-
-    private async Task ExecuteAsync(CancellationToken ct)
-    {
-        if (ct.IsCancellationRequested)
-            return;
-
-        try
+        public ConsumerGroup(Func<CancellationToken, Task> loop, int maxConcurrency) : base(loop, maxConcurrency)
         {
-            await _consumer(ct);
-
-            // Completed
-        }
-        catch (OperationCanceledException e) when (e.CancellationToken == ct)
-        {
-            // Completed gracefully on request
-        }
-        catch (Exception e)
-        {
-            Exception = e;
         }
     }
 
-    public async Task StopAsync(CancellationToken forceExitToken)
+    // Parametrized class, to be used with the Dependency Injection container
+    internal class ConsumerGroupBase<T> : IBackgroundService
     {
-        // Do not cancel the execution immediately, as it will finish gracefully itself (when the channel is closed)
+        private readonly List<Consumer> _consumers;
 
-        // TODO .NET 6 async...
-        using var linked = forceExitToken.Register(() => _executionCts?.Cancel());
+        protected ConsumerGroupBase(Func<CancellationToken, Task> loop, int maxConcurrency)
+        {
+            _consumers = Enumerable.Range(1, maxConcurrency)
+                .Select(_ => new Consumer(loop))
+                .ToList();
+        }
 
-        if (_execution is not null)
-            await _execution;
+        public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
+
+        public Task ExecuteAsync(CancellationToken ct) =>
+            Task.WhenAll(_consumers.Select(c => c.ExecuteAsync(ct)));
+
+        public Task StopAsync(CancellationToken ct) =>
+            Task.WhenAll(_consumers.Select(c => c.StopAsync(ct)));
     }
 
-    public void Dispose()
-    {
-        _executionCts?.Dispose();
-        _execution?.Dispose();
-    }
-}
-
-// With predefined static size
-internal sealed class ConsumerGroup : IBackgroundServiceSupervisor
-{
-    private readonly ImmutableArray<ConsumerSupervisor> _services;
-
-    public ConsumerGroup(Func<CancellationToken, Task> consumer, int maxConcurrency)
-    {
-        _services = Enumerable.Range(1, maxConcurrency)
-            .Select(_ => new ConsumerSupervisor(consumer))
-            .ToImmutableArray();
-    }
-
-    public Task StartAsync(CancellationToken ct) =>
-        Task.WhenAll(_services.Select(service => service.StartAsync(ct)));
-    // TODO Log info
-
-    public Task StopAsync(CancellationToken ct) =>
-        Task.WhenAll(_services.Select(service => service.StopAsync(ct)));
-    // TODO Log info
-
-    public bool Started => _services.All(c => c.Started);
-    public bool Running => _services.All(c => c.Running);
-    public bool Crashed => _services.Any(c => c.Crashed);
-    public Exception? Exception => null; // TODO Implement
-
-    public void Dispose()
-    {
-        foreach (var disposable in _services)
-            disposable.Dispose();
-    }
-}
-
-internal sealed partial class BackgroundQueue<T>
-{
     internal sealed class Consumer
     {
-        private readonly IAsyncEnumerable<T> _reader;
-        private readonly Handler<T> _handler;
-
-        public Consumer(IAsyncEnumerable<T> reader, Handler<T> handler)
-        {
-            _reader = reader;
-            _handler = handler;
-        }
-
-        public async Task Run(CancellationToken ct)
-        {
-            await foreach (var message in _reader.WithCancellation(ct))
-                await _handler(message, ct);
-        }
-    }
-
-    internal sealed class BatchConsumer<TOut>
-    {
-        private readonly ChannelReader<T> _source;
-        private readonly ChannelWriter<TOut> _destination;
-        private readonly BatchBuilderFactory<T, TOut> _factory;
-
-        private IBatchBuilder<T, TOut> _batch;
-
-        public BatchConsumer(ChannelReader<T> source, ChannelWriter<TOut> destination, BatchBuilderFactory<T, TOut> factory)
-        {
-            _source = source;
-            _destination = destination;
-            _factory = factory;
-
-            _batch = factory();
-        }
-
-        public async Task Run(CancellationToken ct)
-        {
-            while (true)
+        public static Func<CancellationToken, Task> Loop<T>(IAsyncEnumerable<T> queue, Handler<T> handler) =>
+            async (CancellationToken ct) =>
             {
-                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct, _batch.TimeWindow);
-                try
-                {
-                    if (!await _source.WaitToReadAsync(cts.Token))
-                        break;
+                await foreach (var message in queue.WithCancellation(ct))
+                    await handler(message, ct);
+            };
 
-                    while (_source.TryRead(out var message))
+        public static Func<CancellationToken, Task> LoopOverDisposables<T>
+            (IAsyncEnumerable<T> queue, Handler<T> handler) where T : IDisposable =>
+            async (CancellationToken ct) =>
+            {
+                await foreach (var message in queue.WithCancellation(ct))
+                    try
                     {
-                        if (_batch.TryAdd(message)) continue;
-                        if (_batch.IsEmpty)
-                            throw new Exception("Cannot fit a message in a batch");
-
-                        await ProcessBatch(ct);
-
-                        if (!_batch.TryAdd(message))
-                            throw new Exception("Cannot fit a message in a batch");
+                        await handler(message, ct);
                     }
-                }
-                catch (OperationCanceledException e) when (e.CancellationToken == _batch.TimeWindow)
-                {
-                    // Just process the current batch
-                    if (!_batch.IsEmpty)
-                        await ProcessBatch(ct);
-                }
-            }
+                    finally
+                    {
+                        message.Dispose();
+                    }
+            };
 
-            _destination.Complete();
-        }
+        private readonly Func<CancellationToken, Task> _loop;
 
-        private async Task ProcessBatch(CancellationToken ct)
+        public Consumer(Func<CancellationToken, Task> loop)
         {
-            await _destination.WriteAsync(_batch.Build(), ct);
-            _batch.Dispose();
-            _batch = _factory();
+            _loop = loop;
         }
+
+        public Task ExecuteAsync(CancellationToken ct) => _loop(ct);
+
+        public Task StopAsync(CancellationToken ct) => _loop(ct); // Process the rest (leftovers)
     }
 }

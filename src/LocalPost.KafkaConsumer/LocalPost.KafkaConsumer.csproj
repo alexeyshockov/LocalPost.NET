@@ -7,9 +7,10 @@
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 
         <PackageId>LocalPost.KafkaConsumer</PackageId>
-        <PackageTags>background;task;queue;kafka</PackageTags>
-        <Description>Local (in-process) background queue for sending to Amazon SNS.</Description>
         <Authors>Alexey Shokov</Authors>
+        <Description>Opinionated Kafka Consumer library, build to be simple, but yet flexible.</Description>
+        <PackageReleaseNotes>https://github.com/alexeyshockov/LocalPost/v$(Version)</PackageReleaseNotes>
+        <PackageTags>background;task;queue;kafka</PackageTags>
         <!-- See https://devblogs.microsoft.com/nuget/add-a-readme-to-your-nuget-package/ -->
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -19,7 +20,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <None Include="..\..\README.md" Pack="true" PackagePath="" />
+        <None Include="README.md" Pack="true" PackagePath="" />
         <None Include="..\..\LICENSE" Pack="true" PackagePath="" />
     </ItemGroup>
 
@@ -44,6 +45,8 @@
         <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="6.0.0" />
         <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="6.0.0" />
 
+        <PackageReference Include="JetBrains.Annotations" Version="2023.3.0" PrivateAssets="All" />
+        <PackageReference Include="PolySharp" Version="1.14.*" PrivateAssets="All" />
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.*" PrivateAssets="All" />
         <PackageReference Include="GitVersion.MsBuild" Version="5.*" PrivateAssets="All" />
     </ItemGroup>

@@ -28,7 +28,8 @@ Before version 8 .NET runtime handled start/stop of the services only synchronou
 See https://github.com/dotnet/runtime/blob/v8.0.0/src/libraries/Microsoft.Extensions.Hosting/src/Internal/Host.cs
 See https://github.com/dotnet/runtime/blob/main/src/libraries/Microsoft.Extensions.Hosting/src/HostOptions.cs
 
-## Similar projects
+## Similar projects / Inspiration
 
+- [FastStream](https://github.com/airtai/faststream) — Python framework with almost the same concept
 - [Coravel queue](https://docs.coravel.net/Queuing/)/event broadcasting — only invocable queueing, event broadcasting is different from consuming a queue
 - [Hangfire](https://www.hangfire.io/) — for persistent queues (means payload serialisation), LocalPost is completely about in-memory ones

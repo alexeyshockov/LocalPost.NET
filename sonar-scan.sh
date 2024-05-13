@@ -8,7 +8,7 @@ set -e
 # $SONAR_TOKEN must be defined
 # $GitVersion_FullSemVer can be used to specify the current version (see GitVersion)
 
-VERSION=""
+VERSION="dev"
 if [ -n "$GitVersion_FullSemVer" ]; then
     VERSION="/v:"$GitVersion_FullSemVer
 fi
@@ -16,7 +16,7 @@ fi
 dotnet build-server shutdown
 dotnet sonarscanner begin \
     /d:sonar.host.url="https://sonarcloud.io" /d:sonar.login="$SONAR_TOKEN" \
-    /o:"alexeyshockov" /k:"alexeyshockov_LocalPost" $VERSION \
+    /o:"alexeyshockov" /k:"alexeyshockov_LocalPost" "$VERSION" \
     /d:sonar.dotnet.excludeTestProjects=true \
     /d:sonar.cs.opencover.reportsPaths="tests/*/TestResults/*/coverage.opencover.xml" \
     /d:sonar.cs.vstest.reportsPaths="tests/*/TestResults/*.trx"

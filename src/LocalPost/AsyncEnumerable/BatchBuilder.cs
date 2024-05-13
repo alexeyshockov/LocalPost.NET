@@ -1,70 +1,149 @@
+using JetBrains.Annotations;
 using Nito.AsyncEx;
 
 namespace LocalPost.AsyncEnumerable;
 
-internal delegate IBatchBuilder<T, TBatch> BatchBuilderFactory<in T, out TBatch>();
+[PublicAPI]
+public readonly record struct BatchSize // TODO Rename to Size?..
+{
+    public static implicit operator int(BatchSize batchSize) => batchSize.Value;
+
+    public static implicit operator BatchSize(int batchSize) => new(batchSize);
+
+    public int Value { get; }
+
+    public BatchSize(int value)
+    {
+        if (value <= 0)
+            throw new ArgumentOutOfRangeException(nameof(value), value, "Batch size must be positive.");
+
+        Value = value;
+    }
+
+    public void Deconstruct(out int value) => value = Value;
+}
+
+internal delegate IBatchBuilder<T, TBatch> BatchBuilderFactory<in T, out TBatch>(CancellationToken ct = default);
 
 internal interface IBatchBuilder<in T, out TBatch> : IDisposable
 {
     CancellationToken TimeWindow { get; }
+    bool TimeWindowClosed { get; }
     Task<bool> TimeWindowTrigger { get; }
 
     bool IsEmpty { get; }
+    bool Full { get; }
 
     bool TryAdd(T entry);
 
     TBatch Build();
+    void Reset();
+    TBatch Flush();
 }
 
-internal abstract class BatchBuilder<T, TBatch> : IBatchBuilder<T, TBatch>
+internal abstract class BatchBuilderBase<T, TBatch> : IBatchBuilder<T, TBatch>
 {
-    private readonly CancellationTokenSource _timeWindow;
-    private readonly CancellationTokenTaskSource<bool> _timeWindowTrigger;
+    private readonly TimeSpan _timeWindowLength;
+    private readonly CancellationToken _ct;
 
-    protected BatchBuilder(TimeSpan timeWindow)
+    private CancellationTokenSource _timeWindow;
+    private CancellationTokenTaskSource<bool>? _timeWindowTrigger;
+
+    protected BatchBuilderBase(TimeSpan timeWindow, CancellationToken ct = default)
     {
-        _timeWindow = new CancellationTokenSource(timeWindow);
-        _timeWindowTrigger = new CancellationTokenTaskSource<bool>(_timeWindow.Token);
+        _timeWindowLength = timeWindow;
+        _ct = ct; // TODO Rename to globalCancellation or something like that
+
+        _timeWindow = StartTimeWindow();
     }
 
     public CancellationToken TimeWindow => _timeWindow.Token;
-    public Task<bool> TimeWindowTrigger => _timeWindowTrigger.Task;
+    public bool TimeWindowClosed => TimeWindow.IsCancellationRequested;
+    public Task<bool> TimeWindowTrigger =>
+        (_timeWindowTrigger ??= new CancellationTokenTaskSource<bool>(_timeWindow.Token)).Task;
+
     public abstract bool IsEmpty { get; }
+    public abstract bool Full { get; }
 
     public abstract bool TryAdd(T entry);
+
     public abstract TBatch Build();
+
+    private CancellationTokenSource StartTimeWindow()
+    {
+        if (_ct == CancellationToken.None)
+            return new CancellationTokenSource(_timeWindowLength);
+
+        var timeWindow = CancellationTokenSource.CreateLinkedTokenSource(_ct);
+        timeWindow.CancelAfter(_timeWindowLength);
+
+        return timeWindow;
+    }
+
+    // Should be overwritten in derived classes, to reset their state also
+    public virtual void Reset()
+    {
+        _timeWindow.Cancel();
+        _timeWindow.Dispose();
+        _timeWindow = StartTimeWindow();
+
+        _timeWindowTrigger?.Dispose();
+        _timeWindowTrigger = null;
+    }
+
+    public TBatch Flush()
+    {
+        var batch = Build();
+        Reset();
+        return batch;
+    }
 
     public void Dispose()
     {
         _timeWindow.Dispose();
-        _timeWindowTrigger.Dispose();
+        _timeWindowTrigger?.Dispose();
     }
 }
 
-internal sealed class BoundedBatchBuilder<T> : BatchBuilder<T, IReadOnlyList<T>>
+internal abstract class BoundedBatchBuilderBase<T, TBatch> : BatchBuilderBase<T, TBatch>
 {
-    public static BatchBuilderFactory<T, IReadOnlyList<T>> Factory(int maxSize, int timeWindow) =>
-        () => new BoundedBatchBuilder<T>(maxSize, TimeSpan.FromMilliseconds(timeWindow));
+    private readonly BatchSize _batchMaxSizeSize;
+    protected List<T> Batch;
 
-    private readonly int _max;
-    private readonly List<T> _batch = new();
-
-    public BoundedBatchBuilder(int max, TimeSpan timeWindow) : base(timeWindow)
+    protected BoundedBatchBuilderBase(BatchSize batchMaxSizeSize, TimeSpan timeWindow, CancellationToken ct = default) :
+        base(timeWindow, ct)
     {
-        _max = max;
+        _batchMaxSizeSize = batchMaxSizeSize;
+        Batch = new List<T>(_batchMaxSizeSize);
     }
 
-    public override bool IsEmpty => _batch.Count == 0;
+    public override bool IsEmpty => Batch.Count == 0;
+
+    public override bool Full => Batch.Count >= _batchMaxSizeSize;
 
     public override bool TryAdd(T entry)
     {
-        if (_batch.Count >= _max)
+        if (Full)
             return false;
 
-        _batch.Add(entry);
+        Batch.Add(entry);
 
         return true;
     }
 
-    public override IReadOnlyList<T> Build() => _batch;
+    public override void Reset()
+    {
+        base.Reset();
+        Batch = new List<T>(_batchMaxSizeSize);
+    }
+}
+
+internal sealed class BoundedBatchBuilder<T> : BoundedBatchBuilderBase<T, IReadOnlyList<T>>
+{
+    public BoundedBatchBuilder(BatchSize batchMaxSizeSize, TimeSpan timeWindow, CancellationToken ct = default) :
+        base(batchMaxSizeSize, timeWindow, ct)
+    {
+    }
+
+    public override IReadOnlyList<T> Build() => Batch;
 }

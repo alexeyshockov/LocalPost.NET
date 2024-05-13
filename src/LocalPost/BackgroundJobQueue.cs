@@ -1,3 +1,5 @@
+using JetBrains.Annotations;
+
 namespace LocalPost;
 
 public delegate Task Job(CancellationToken ct);
@@ -9,11 +11,12 @@ public interface IBackgroundJobQueue : IBackgroundQueue<Job>
 {
 }
 
+[UsedImplicitly]
 internal sealed class BackgroundJobQueue : IBackgroundJobQueue
 {
-    private readonly BackgroundQueue<Job> _queue;
+    private readonly BackgroundQueue<Job, Job> _queue;
 
-    public BackgroundJobQueue(BackgroundQueue<Job> queue)
+    public BackgroundJobQueue(BackgroundQueue<Job, Job> queue)
     {
         _queue = queue;
     }

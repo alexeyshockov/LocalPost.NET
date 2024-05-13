@@ -2,7 +2,7 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost", "src\LocalPost\LocalPost.csproj", "{474D2C1A-5557-4ED9-AF20-FE195D4C1AF7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AmazonSqsApp", "samples\AmazonSqsApp\AmazonSqsApp.csproj", "{46FC61E6-D0FB-4D7D-A81B-20EF8D8D1F4E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BackgroundQueueApp", "samples\BackgroundQueueApp\BackgroundQueueApp.csproj", "{46FC61E6-D0FB-4D7D-A81B-20EF8D8D1F4E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost.SnsPublisher", "src\LocalPost.SnsPublisher\LocalPost.SnsPublisher.csproj", "{D256C568-2B42-4DCC-AB54-15B512A99C44}"
 EndProject
@@ -22,9 +22,19 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost.KafkaConsumer", "
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Examples", "Examples", "{405721DC-F290-4191-B638-9907D5EB042B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KafkaConsumerApp", "samples\KafkaConsumerApp\KafkaConsumerApp.csproj", "{CB4358CA-D6AD-4106-A7B5-FA4AC8C7E55B}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AzureQueueApp", "samples\AzureQueueApp\AzureQueueApp.csproj", "{7C21BB9A-9C68-4750-84AA-272F201878A1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KafkaConsumerApp", "samples\KafkaConsumerApp\KafkaConsumerApp.csproj", "{C310487A-B976-4D3E-80AF-4ADBE1C63139}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SqsConsumerApp", "samples\SqsConsumerApp\SqsConsumerApp.csproj", "{2778AEBD-0345-4F79-9E93-73AFAB6C7BCD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost.Polly", "src\LocalPost.Polly\LocalPost.Polly.csproj", "{EA69FF51-BEF7-415C-836A-BB5432206F7E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RabbitMqConsumerApp", "samples\RabbitMqConsumerApp\RabbitMqConsumerApp.csproj", "{F9BD092A-DC16-43A8-B605-46FDFAEFBEDA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost.KafkaConsumer.Tests", "tests\LocalPost.KafkaConsumer.Tests\LocalPost.KafkaConsumer.Tests.csproj", "{734C9C76-B3D8-4AD7-8E76-B14539C3CB4D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost.RabbitMqConsumer.Tests", "tests\LocalPost.RabbitMqConsumer.Tests\LocalPost.RabbitMqConsumer.Tests.csproj", "{92461B19-6794-4EB2-BFFE-DCD9CDFFD6D8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -72,18 +82,40 @@ Global
 		{D9139C53-5B9F-49E7-80DF-41C995C37E2F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D9139C53-5B9F-49E7-80DF-41C995C37E2F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D9139C53-5B9F-49E7-80DF-41C995C37E2F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{CB4358CA-D6AD-4106-A7B5-FA4AC8C7E55B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{CB4358CA-D6AD-4106-A7B5-FA4AC8C7E55B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{CB4358CA-D6AD-4106-A7B5-FA4AC8C7E55B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{CB4358CA-D6AD-4106-A7B5-FA4AC8C7E55B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{7C21BB9A-9C68-4750-84AA-272F201878A1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{7C21BB9A-9C68-4750-84AA-272F201878A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7C21BB9A-9C68-4750-84AA-272F201878A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7C21BB9A-9C68-4750-84AA-272F201878A1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C310487A-B976-4D3E-80AF-4ADBE1C63139}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C310487A-B976-4D3E-80AF-4ADBE1C63139}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C310487A-B976-4D3E-80AF-4ADBE1C63139}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C310487A-B976-4D3E-80AF-4ADBE1C63139}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2778AEBD-0345-4F79-9E93-73AFAB6C7BCD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2778AEBD-0345-4F79-9E93-73AFAB6C7BCD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2778AEBD-0345-4F79-9E93-73AFAB6C7BCD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2778AEBD-0345-4F79-9E93-73AFAB6C7BCD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EA69FF51-BEF7-415C-836A-BB5432206F7E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EA69FF51-BEF7-415C-836A-BB5432206F7E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EA69FF51-BEF7-415C-836A-BB5432206F7E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EA69FF51-BEF7-415C-836A-BB5432206F7E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F9BD092A-DC16-43A8-B605-46FDFAEFBEDA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F9BD092A-DC16-43A8-B605-46FDFAEFBEDA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F9BD092A-DC16-43A8-B605-46FDFAEFBEDA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F9BD092A-DC16-43A8-B605-46FDFAEFBEDA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{734C9C76-B3D8-4AD7-8E76-B14539C3CB4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{734C9C76-B3D8-4AD7-8E76-B14539C3CB4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{734C9C76-B3D8-4AD7-8E76-B14539C3CB4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{734C9C76-B3D8-4AD7-8E76-B14539C3CB4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{92461B19-6794-4EB2-BFFE-DCD9CDFFD6D8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{92461B19-6794-4EB2-BFFE-DCD9CDFFD6D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{92461B19-6794-4EB2-BFFE-DCD9CDFFD6D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{92461B19-6794-4EB2-BFFE-DCD9CDFFD6D8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{46FC61E6-D0FB-4D7D-A81B-20EF8D8D1F4E} = {405721DC-F290-4191-B638-9907D5EB042B}
-		{CB4358CA-D6AD-4106-A7B5-FA4AC8C7E55B} = {405721DC-F290-4191-B638-9907D5EB042B}
 		{7C21BB9A-9C68-4750-84AA-272F201878A1} = {405721DC-F290-4191-B638-9907D5EB042B}
+		{C310487A-B976-4D3E-80AF-4ADBE1C63139} = {405721DC-F290-4191-B638-9907D5EB042B}
+		{2778AEBD-0345-4F79-9E93-73AFAB6C7BCD} = {405721DC-F290-4191-B638-9907D5EB042B}
+		{F9BD092A-DC16-43A8-B605-46FDFAEFBEDA} = {405721DC-F290-4191-B638-9907D5EB042B}
 	EndGlobalSection
 EndGlobal

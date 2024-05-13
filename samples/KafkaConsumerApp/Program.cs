@@ -1,25 +1,65 @@
-var builder = WebApplication.CreateBuilder(args);
+using System.ComponentModel.DataAnnotations;
+using Confluent.Kafka;
+using LocalPost;
+using LocalPost.KafkaConsumer;
+using LocalPost.KafkaConsumer.DependencyInjection;
 
-// Add services to the container.
+var host = Host.CreateDefaultBuilder(args)
+    .ConfigureServices((context, services) =>
+    {
+        services.AddOptions<KafkaOptions>()
+            .Bind(context.Configuration.GetSection(KafkaOptions.ConfigSection))
+            .ValidateDataAnnotations();
 
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+        services.AddScoped<KafkaTopicHandler>();
+        services.AddKafkaConsumer<string>("orders",
+            builder =>
+            {
+                builder.SetHandler<KafkaTopicHandler>();
+            },
+            builder =>
+            {
+                builder.SetValueDeserializer(new StringDeserializer());
+            }).Configure<KafkaOptions>((options, kafkaOptions) =>
+            {
+                options.Kafka.GroupId = "";
+                options.Kafka.AutoOffsetReset = AutoOffsetReset.Earliest;
+                options.Kafka.EnableAutoCommit = false; // TODO DryRun
 
-var app = builder.Build();
+                options.Kafka.BootstrapServers = "localhost:9092";
+                options.Kafka.SecurityProtocol = SecurityProtocol.SaslSsl;
+                options.Kafka.SaslMechanism = SaslMechanism.Plain;
+                options.Kafka.SaslUsername = "admin";
+                options.Kafka.SaslPassword = "";
+            });
+        // Only one consumer per name (topic) is allowed
+        services.AddBatchKafkaConsumer<string>("orders",
+            builder =>
+            {
+            },
+            builder =>
+            {
+            });
+    })
+    .Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+host.Run();
+
+public sealed record KafkaOptions
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    public const string ConfigSection = "Kafka";
+
+    [Required]
+    public string BootstrapServers { get; init; } = null!;
+
+    public Dictionary<string, Options> Consumers { get; init; } = new();
 }
 
-app.UseHttpsRedirection();
-
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
+internal class KafkaTopicHandler : IHandler<ConsumeContext<string>>
+{
+    public async Task InvokeAsync(ConsumeContext<string> payload, CancellationToken ct)
+    {
+        await Task.Delay(1_000, ct);
+        Console.WriteLine(payload.Payload);
+    }
+}
