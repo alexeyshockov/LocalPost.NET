@@ -4,7 +4,7 @@ using JetBrains.Annotations;
 namespace LocalPost.BackgroundQueues;
 
 [PublicAPI]
-public static partial class HandlerStackEx
+public static class HandlerStackEx
 {
     public static HandlerFactory<ConsumeContext<T>> UsePayload<T>(this HandlerFactory<T> hf) =>
         hf.Map<ConsumeContext<T>, T>(next => async (context, ct) => await next(context.Payload, ct));
@@ -16,9 +16,9 @@ public static partial class HandlerStackEx
         return hf.Map<ConsumeContext<T>, ConsumeContext<T>>(next => async (context, ct) =>
         {
             using var activity = context.ActivityContext.HasValue
-                ? BackgroundActivitySource.Source.StartActivity(transactionName, ActivityKind.Consumer,
+                ? Tracing.Source.StartActivity(transactionName, ActivityKind.Consumer,
                     context.ActivityContext.Value)
-                : BackgroundActivitySource.Source.StartActivity(transactionName, ActivityKind.Consumer);
+                : Tracing.Source.StartActivity(transactionName, ActivityKind.Consumer);
             try
             {
                 await next(context, ct);

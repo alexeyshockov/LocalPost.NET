@@ -18,7 +18,7 @@ public static class HandlerStackEx
         this HandlerFactory<ConsumeContext<T>> handlerStack) =>
         handlerStack.Map<ConsumeContext<T>, ConsumeContext<T>>(next => async (context, ct) =>
         {
-            using var activity = SqsActivitySource.StartProcessing(context);
+            using var activity = Tracing.StartProcessing(context);
             try
             {
                 await next(context, ct);
@@ -36,7 +36,7 @@ public static class HandlerStackEx
         handlerStack.Map<BatchConsumeContext<T>, BatchConsumeContext<T>>(next => async (context, ct) =>
         {
             // TODO Link distributed transactions from each message
-            using var activity = SqsActivitySource.StartProcessing(context);
+            using var activity = Tracing.StartProcessing(context);
             try
             {
                 await next(context, ct);

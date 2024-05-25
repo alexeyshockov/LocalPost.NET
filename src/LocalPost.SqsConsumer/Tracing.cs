@@ -67,18 +67,18 @@ internal static class SqsActivityExtensions
 //  - https://github.com/npgsql/npgsql/blob/main/src/Npgsql/NpgsqlActivitySource.cs#LL61C31-L61C49
 //  - https://github.com/npgsql/npgsql/blob/main/src/Npgsql/NpgsqlCommand.cs#L1639-L1644
 // Also OTEL semantic convention: https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/
-internal static class SqsActivitySource
+internal static class Tracing
 {
-    private static readonly System.Diagnostics.ActivitySource Source;
+    private static readonly ActivitySource Source;
 
     public static bool IsEnabled => Source.HasListeners();
 
-    static SqsActivitySource()
+    static Tracing()
     {
         // See https://stackoverflow.com/a/909583/322079
         var assembly = Assembly.GetExecutingAssembly();
-        var version = AssemblyName.GetAssemblyName(assembly.Location).Version;
-        Source = new System.Diagnostics.ActivitySource(assembly.FullName, version.ToString());
+        var version = assembly.GetName().Version;
+        Source = new ActivitySource(assembly.FullName, version.ToString());
     }
 
     public static Activity? StartProcessing<T>(ConsumeContext<T> context)

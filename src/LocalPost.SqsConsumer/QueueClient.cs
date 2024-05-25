@@ -70,7 +70,7 @@ internal sealed class QueueClient : INamedService
 
     public async Task<IEnumerable<Message>> PullMessagesAsync(CancellationToken ct)
     {
-        using var activity = SqsActivitySource.StartReceiving(this);
+        using var activity = Tracing.StartReceiving(this);
 
         var attributeNames = EndpointOptions.AllAttributes; // Make configurable, later
         var messageAttributeNames = EndpointOptions.AllMessageAttributes; // Make configurable, later
@@ -100,7 +100,7 @@ internal sealed class QueueClient : INamedService
 
     public async Task DeleteMessageAsync<T>(ConsumeContext<T> context)
     {
-        using var activity = SqsActivitySource.StartSettling(context);
+        using var activity = Tracing.StartSettling(context);
         await _sqs.DeleteMessageAsync(QueueUrl, context.ReceiptHandle);
 
         // TODO Log failures?..
@@ -108,7 +108,7 @@ internal sealed class QueueClient : INamedService
 
     public async Task DeleteMessagesAsync<T>(BatchConsumeContext<T> context)
     {
-        using var activity = SqsActivitySource.StartSettling(context);
+        using var activity = Tracing.StartSettling(context);
 
         var requests = context.Messages
             .Select((message, i) => new DeleteMessageBatchRequestEntry(i.ToString(), message.ReceiptHandle))

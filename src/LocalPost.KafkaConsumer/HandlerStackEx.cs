@@ -19,7 +19,7 @@ public static class HandlerStackEx
         hf.Map<ConsumeContext<T>, ConsumeContext<T>>(next =>
             async (context, ct) =>
             {
-                using var activity = KafkaActivitySource.StartProcessing(context);
+                using var activity = Tracing.StartProcessing(context);
                 try
                 {
                     await next(context, ct);
@@ -36,7 +36,7 @@ public static class HandlerStackEx
         hf.Map<BatchConsumeContext<T>, BatchConsumeContext<T>>(next =>
             async (context, ct) =>
             {
-                using var activity = KafkaActivitySource.StartProcessing(context);
+                using var activity = Tracing.StartProcessing(context);
                 try
                 {
                     await next(context, ct);

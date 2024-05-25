@@ -12,17 +12,17 @@ public static partial class ServiceCollectionEx
         if (!services.TryAddNamedSingleton(name, CreateConsumer))
             return false;
 
-        services.AddBackgroundServiceForNamed<BackgroundQueue.NamedConsumer<TQ, T>>(name);
+        services.AddBackgroundServiceForNamed<Queue.NamedConsumer<TQ, T>>(name);
 
         return true;
 
-        BackgroundQueue.NamedConsumer<TQ, T> CreateConsumer(IServiceProvider provider)
+        Queue.NamedConsumer<TQ, T> CreateConsumer(IServiceProvider provider)
         {
             var options = of(provider);
             var handler = hf(provider);
 
-            return new BackgroundQueue.NamedConsumer<TQ, T>(
-                provider.GetRequiredService<ILogger<BackgroundQueue.ConsumerBase<T>>>(),
+            return new Queue.NamedConsumer<TQ, T>(
+                provider.GetRequiredService<ILogger<Queue.ConsumerBase<T>>>(),
                 provider.GetRequiredService<TQ>(name), handler, options.MaxConcurrency)
             {
                 BreakOnException = options.BreakOnException
@@ -37,17 +37,17 @@ public static partial class ServiceCollectionEx
         if (!services.TryAddSingleton(CreateConsumer))
             return false;
 
-        services.AddBackgroundServiceFor<BackgroundQueue.Consumer<TQ, T>>();
+        services.AddBackgroundServiceFor<Queue.Consumer<TQ, T>>();
 
         return true;
 
-        BackgroundQueue.Consumer<TQ, T> CreateConsumer(IServiceProvider provider)
+        Queue.Consumer<TQ, T> CreateConsumer(IServiceProvider provider)
         {
             var options = of(provider);
             var handler = hf(provider);
 
-            return new BackgroundQueue.Consumer<TQ, T>(
-                provider.GetRequiredService<ILogger<BackgroundQueue.ConsumerBase<T>>>(),
+            return new Queue.Consumer<TQ, T>(
+                provider.GetRequiredService<ILogger<Queue.ConsumerBase<T>>>(),
                 provider.GetRequiredService<TQ>(), handler, options.MaxConcurrency)
             {
                 BreakOnException = options.BreakOnException

@@ -5,7 +5,7 @@ namespace LocalPost;
 
 internal sealed record ConsumerOptions(ushort MaxConcurrency, bool BreakOnException);
 
-internal static class BackgroundQueue
+internal static class Queue
 {
     // public static ConsumerGroup<TQ, T> ConsumerGroupFor<T, TQ>(TQ queue, Handler<T> handler, ushort maxConcurrency)
     //     where TQ : IAsyncEnumerable<T> => new(Consumer.LoopOver(queue, handler), maxConcurrency);

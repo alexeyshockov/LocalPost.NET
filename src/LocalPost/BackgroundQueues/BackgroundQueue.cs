@@ -55,14 +55,13 @@ internal sealed class BackgroundQueue<T, TOut>(
     ChannelWriter<ConsumeContext<T>> input,
     IAsyncEnumerable<TOut> pipeline,
     TimeSpan completionDelay)
-    : IAsyncEnumerable<TOut>, IBackgroundService, IBackgroundQueue<T>, IQueuePublisher<ConsumeContext<T>>
+    : IAsyncEnumerable<TOut>, IBackgroundService, IBackgroundQueue<T>
 {
     public IAsyncEnumerator<TOut> GetAsyncEnumerator(CancellationToken ct) => pipeline.GetAsyncEnumerator(ct);
 
     // Track full or not later
-    public ValueTask Enqueue(ConsumeContext<T> item, CancellationToken ct = default) => input.WriteAsync(item, ct);
-
-    public ValueTask Enqueue(T item, CancellationToken ct = default) => Enqueue(new ConsumeContext<T>(item), ct);
+    public ValueTask Enqueue(T item, CancellationToken ct = default) =>
+        input.WriteAsync(new ConsumeContext<T>(item), ct);
 
     public bool IsClosed { get; private set; } // TODO Use
 

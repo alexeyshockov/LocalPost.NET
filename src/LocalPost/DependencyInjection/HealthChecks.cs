@@ -33,7 +33,7 @@ internal static class HealthChecksBuilderEx
         string? name = default, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default)
         where TQ : IAsyncEnumerable<T>
     {
-        var check = HealthChecks.LivenessCheckFor<BackgroundQueue.Consumer<TQ, T>>(failureStatus, tags);
+        var check = HealthChecks.LivenessCheckFor<Queue.Consumer<TQ, T>>(failureStatus, tags);
         if (name is not null)
             check.Name = name;
 
@@ -44,7 +44,7 @@ internal static class HealthChecksBuilderEx
         string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default)
         where TQ : IAsyncEnumerable<T>, INamedService
     {
-        var check = HealthChecks.LivenessCheckForNamed<BackgroundQueue.NamedConsumer<TQ, T>>(name, failureStatus, tags);
+        var check = HealthChecks.LivenessCheckForNamed<Queue.NamedConsumer<TQ, T>>(name, failureStatus, tags);
 
         return builder.Add(check);
     }
