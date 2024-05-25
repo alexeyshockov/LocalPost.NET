@@ -8,7 +8,7 @@ namespace LocalPost.BackgroundQueues.DependencyInjection;
 [PublicAPI]
 public class BackgroundQueuesBuilder(IServiceCollection services)
 {
-    public OptionsBuilder<BackgroundQueueOptions<BackgroundJob>> AddJobQueue()
+    public OptionsBuilder<Options<BackgroundJob>> AddJobQueue()
     {
         services.TryAddSingleton<BackgroundJobQueue>();
         services.TryAddSingletonAlias<IBackgroundJobQueue, BackgroundJobQueue>();
@@ -23,7 +23,7 @@ public class BackgroundQueuesBuilder(IServiceCollection services)
     }
 
     // THandler has to be registered by the user
-    public OptionsBuilder<BackgroundQueueOptions<T>> AddQueue<T, THandler>()
+    public OptionsBuilder<Options<T>> AddQueue<T, THandler>()
         where THandler : IHandler<T> =>
         AddQueue(
             HandlerStack.From<THandler, T>()
@@ -32,23 +32,23 @@ public class BackgroundQueuesBuilder(IServiceCollection services)
                 .Trace()
         );
 
-    public OptionsBuilder<BackgroundQueueOptions<T>> AddQueue<T>(HandlerFactory<ConsumeContext<T>> hf)
+    public OptionsBuilder<Options<T>> AddQueue<T>(HandlerFactory<ConsumeContext<T>> hf)
     {
         if (!services.TryAddSingletonAlias<IBackgroundQueue<T>, BackgroundQueue<T, ConsumeContext<T>>>())
             // return ob; // Already added, don't register twice
             throw new InvalidOperationException($"BackgroundQueue<{Reflection.FriendlyNameOf<T>()}> is already registered.");
 
         services.TryAddSingleton(provider =>
-            BackgroundQueue.Create<T>(provider.GetOptions<BackgroundQueueOptions<T>>()));
+            BackgroundQueue.Create<T>(provider.GetOptions<Options<T>>()));
         services.AddBackgroundServiceFor<BackgroundQueue<T, ConsumeContext<T>>>();
 
         services.TryAddBackgroundConsumer<ConsumeContext<T>, BackgroundQueue<T, ConsumeContext<T>>>(hf, provider =>
         {
-            var options = provider.GetOptions<BackgroundQueueOptions<T>>();
+            var options = provider.GetOptions<Options<T>>();
             return new ConsumerOptions(options.MaxConcurrency, false);
         });
 
-        return services.AddOptions<BackgroundQueueOptions<T>>();
+        return services.AddOptions<Options<T>>();
     }
 
     // TODO Batched

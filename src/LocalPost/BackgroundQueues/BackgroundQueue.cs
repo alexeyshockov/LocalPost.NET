@@ -5,11 +5,11 @@ namespace LocalPost.BackgroundQueues;
 
 internal static class BackgroundQueue
 {
-    public static BackgroundQueue<T, ConsumeContext<T>> Create<T>(BackgroundQueueOptions options) =>
+    public static BackgroundQueue<T, ConsumeContext<T>> Create<T>(Options options) =>
         Create<T, ConsumeContext<T>>(options, reader => reader.ReadAllAsync());
 
     public static BackgroundQueue<T, IReadOnlyList<ConsumeContext<T>>> CreateBatched<T>(
-        BatchedBackgroundQueueOptions options) =>
+        BatchedOptions options) =>
         Create<T, IReadOnlyList<ConsumeContext<T>>>(options,
             reader => reader
                 .ReadAllAsync()
@@ -18,7 +18,7 @@ internal static class BackgroundQueue
             true);
 
     // To make the pipeline linear (single consumer), just add .ToConcurrent() to the end
-    public static BackgroundQueue<T, TOut> Create<T, TOut>(BackgroundQueueOptions options,
+    public static BackgroundQueue<T, TOut> Create<T, TOut>(Options options,
         Func<ChannelReader<ConsumeContext<T>>, IAsyncEnumerable<TOut>> configure,
         bool proxy = false) // TODO Rename this parameter somehow...
     {
@@ -42,7 +42,7 @@ internal static class BackgroundQueue
             pipeline = pipeline.ToConcurrent();
 
         return new BackgroundQueue<T, TOut>(channel, pipeline,
-            TimeSpan.FromMilliseconds(options.CompletionTimeout));
+            TimeSpan.FromMilliseconds(options.CompletionDelay));
     }
 }
 
