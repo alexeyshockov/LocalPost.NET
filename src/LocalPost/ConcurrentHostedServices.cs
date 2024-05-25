@@ -60,32 +60,20 @@ internal interface IBackgroundServiceMonitor
     public Exception? Exception { get; }
 }
 
-internal class NamedBackgroundServiceRunner<T> : BackgroundServiceRunner<T>, INamedService
+internal class NamedBackgroundServiceRunner<T>(T service, IHostApplicationLifetime appLifetime)
+    : BackgroundServiceRunner<T>(service, appLifetime), INamedService
     where T : class, IBackgroundService, INamedService
 {
-    public NamedBackgroundServiceRunner(T service, IHostApplicationLifetime appLifetime) : base(service, appLifetime)
-    {
-        Name = service.Name;
-    }
-
-    public string Name { get; }
+    public string Name { get; } = service.Name;
 }
 
-internal class BackgroundServiceRunner<T> : IConcurrentHostedService, IBackgroundServiceMonitor, IDisposable
+internal class BackgroundServiceRunner<T>(T service, IHostApplicationLifetime appLifetime)
+    : IConcurrentHostedService, IBackgroundServiceMonitor, IDisposable
     where T : class, IBackgroundService
 {
     private Task? _start;
     private CancellationTokenSource? _executionCts;
     private Task? _execution;
-
-    private readonly T _service;
-    private readonly IHostApplicationLifetime _appLifetime;
-
-    public BackgroundServiceRunner(T service, IHostApplicationLifetime appLifetime)
-    {
-        _service = service;
-        _appLifetime = appLifetime;
-    }
 
     public bool Starting => _start is not null && !_start.IsCompleted;
 
@@ -105,10 +93,10 @@ internal class BackgroundServiceRunner<T> : IConcurrentHostedService, IBackgroun
     {
         try
         {
-            // Wait until all other services are started
-            await Task.Delay(Timeout.Infinite, _appLifetime.ApplicationStarted).WaitAsync(ct);
+            // Wait until all other services have started
+            await Task.Delay(Timeout.Infinite, appLifetime.ApplicationStarted).WaitAsync(ct);
         }
-        catch (OperationCanceledException e) when (e.CancellationToken == _appLifetime.ApplicationStarted)
+        catch (OperationCanceledException e) when (e.CancellationToken == appLifetime.ApplicationStarted)
         {
             // Startup completed, continue
         }
@@ -120,7 +108,7 @@ internal class BackgroundServiceRunner<T> : IConcurrentHostedService, IBackgroun
         if (_start is not null)
             throw new InvalidOperationException("Service is already started");
 
-        await (_start = _service.StartAsync(ct));
+        await (_start = service.StartAsync(ct));
 
         // Start execution in the background...
 #pragma warning disable CS4014
@@ -136,9 +124,9 @@ internal class BackgroundServiceRunner<T> : IConcurrentHostedService, IBackgroun
         try
         {
             await WaitAppStartAsync(ct);
-            await (_execution = _service.ExecuteAsync(ct));
+            await (_execution = service.ExecuteAsync(ct));
         }
-        catch (OperationCanceledException e) when (e.CancellationToken == ct)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             // Normal case, we trigger this token ourselves when stopping the service
         }
@@ -164,7 +152,7 @@ internal class BackgroundServiceRunner<T> : IConcurrentHostedService, IBackgroun
             // Wait until the execution completes or the app is forced to exit
             await _execution.WaitAsync(forceExitToken);
 
-        await _service.StopAsync(forceExitToken);
+        await service.StopAsync(forceExitToken);
     }
 
     public void Dispose()
@@ -177,14 +165,9 @@ internal interface IConcurrentHostedService : IHostedService
 {
 }
 
-internal sealed class ConcurrentHostedServices : IHostedService
+internal sealed class ConcurrentHostedServices(IEnumerable<IConcurrentHostedService> services) : IHostedService
 {
-    private readonly ImmutableArray<IConcurrentHostedService> _services;
-
-    public ConcurrentHostedServices(IEnumerable<IConcurrentHostedService> services)
-    {
-        _services = services.ToImmutableArray();
-    }
+    private readonly ImmutableArray<IConcurrentHostedService> _services = services.ToImmutableArray();
 
     public Task StartAsync(CancellationToken cancellationToken) =>
         Task.WhenAll(_services.Select(c => c.StartAsync(cancellationToken)));

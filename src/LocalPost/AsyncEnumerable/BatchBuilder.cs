@@ -1,27 +1,6 @@
-using JetBrains.Annotations;
 using Nito.AsyncEx;
 
 namespace LocalPost.AsyncEnumerable;
-
-[PublicAPI]
-public readonly record struct BatchSize // TODO Rename to Size?..
-{
-    public static implicit operator int(BatchSize batchSize) => batchSize.Value;
-
-    public static implicit operator BatchSize(int batchSize) => new(batchSize);
-
-    public int Value { get; }
-
-    public BatchSize(int value)
-    {
-        if (value <= 0)
-            throw new ArgumentOutOfRangeException(nameof(value), value, "Batch size must be positive.");
-
-        Value = value;
-    }
-
-    public void Deconstruct(out int value) => value = Value;
-}
 
 internal delegate IBatchBuilder<T, TBatch> BatchBuilderFactory<in T, out TBatch>(CancellationToken ct = default);
 
@@ -107,19 +86,19 @@ internal abstract class BatchBuilderBase<T, TBatch> : IBatchBuilder<T, TBatch>
 
 internal abstract class BoundedBatchBuilderBase<T, TBatch> : BatchBuilderBase<T, TBatch>
 {
-    private readonly BatchSize _batchMaxSizeSize;
-    protected List<T> Batch;
+    private readonly MaxSize _batchMaxSize;
+    protected List<T> Batch; // FIXME ImmutableArrayBuilder
 
-    protected BoundedBatchBuilderBase(BatchSize batchMaxSizeSize, TimeSpan timeWindow, CancellationToken ct = default) :
+    protected BoundedBatchBuilderBase(MaxSize batchMaxSize, TimeSpan timeWindow, CancellationToken ct = default) :
         base(timeWindow, ct)
     {
-        _batchMaxSizeSize = batchMaxSizeSize;
-        Batch = new List<T>(_batchMaxSizeSize);
+        _batchMaxSize = batchMaxSize;
+        Batch = new List<T>(_batchMaxSize);
     }
 
     public override bool IsEmpty => Batch.Count == 0;
 
-    public override bool Full => Batch.Count >= _batchMaxSizeSize;
+    public override bool Full => Batch.Count >= _batchMaxSize;
 
     public override bool TryAdd(T entry)
     {
@@ -134,14 +113,14 @@ internal abstract class BoundedBatchBuilderBase<T, TBatch> : BatchBuilderBase<T,
     public override void Reset()
     {
         base.Reset();
-        Batch = new List<T>(_batchMaxSizeSize);
+        Batch = new List<T>(_batchMaxSize);
     }
 }
 
 internal sealed class BoundedBatchBuilder<T> : BoundedBatchBuilderBase<T, IReadOnlyList<T>>
 {
-    public BoundedBatchBuilder(BatchSize batchMaxSizeSize, TimeSpan timeWindow, CancellationToken ct = default) :
-        base(batchMaxSizeSize, timeWindow, ct)
+    public BoundedBatchBuilder(MaxSize batchMaxSize, TimeSpan timeWindow, CancellationToken ct = default) :
+        base(batchMaxSize, timeWindow, ct)
     {
     }
 

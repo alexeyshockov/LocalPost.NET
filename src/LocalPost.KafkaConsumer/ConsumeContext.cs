@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using Confluent.Kafka;
 using JetBrains.Annotations;
 using LocalPost.AsyncEnumerable;
@@ -8,8 +7,8 @@ namespace LocalPost.KafkaConsumer;
 internal static class ConsumeContext
 {
     public static BatchBuilderFactory<ConsumeContext<byte[]>, BatchConsumeContext<byte[]>> BatchBuilder(
-        BatchSize batchMaxSizeSize, TimeSpan timeWindow) => ct =>
-        new BatchConsumeContext<byte[]>.Builder(batchMaxSizeSize, timeWindow, ct);
+        MaxSize batchMaxSize, TimeSpan timeWindow) => ct =>
+        new BatchConsumeContext<byte[]>.Builder(batchMaxSize, timeWindow, ct);
 }
 
 [PublicAPI]
@@ -29,35 +28,46 @@ public readonly record struct ConsumeContext<T>
         Payload = payload;
     }
 
+    public void Deconstruct(out T payload, out IReadOnlyList<IHeader> headers)
+    {
+        payload = Payload;
+        headers = Headers;
+    }
+
     public string Topic => Client.Topic;
 
     public IReadOnlyList<IHeader> Headers => Message.Headers.BackingList;
 
     public ConsumeContext<TOut> Transform<TOut>(TOut payload) => new(Client, Offset, Message, payload);
 
-    public static implicit operator T(ConsumeContext<T> context) => context.Payload;
+    public ConsumeContext<TOut> Transform<TOut>(Func<ConsumeContext<T>, TOut> transform) => Transform(transform(this));
 
-    public void Deconstruct(out T payload, out IReadOnlyList<IHeader> headers)
-    {
-        payload = Payload;
-        headers = Headers;
-    }
+    public async Task<ConsumeContext<TOut>> Transform<TOut>(Func<ConsumeContext<T>, Task<TOut>> transform) =>
+        Transform(await transform(this));
+
+    public static implicit operator T(ConsumeContext<T> context) => context.Payload;
 }
 
 [PublicAPI]
 public readonly record struct BatchConsumeContext<T>
 {
-    internal sealed class Builder :
-        BoundedBatchBuilderBase<ConsumeContext<T>, BatchConsumeContext<T>>
+    internal sealed class Builder(MaxSize batchMaxSize, TimeSpan timeWindow, CancellationToken ct = default)
+        : BoundedBatchBuilderBase<ConsumeContext<T>, BatchConsumeContext<T>>(batchMaxSize, timeWindow, ct)
     {
-        public Builder(BatchSize batchMaxSizeSize, TimeSpan timeWindow, CancellationToken ct = default) :
-            base(batchMaxSizeSize, timeWindow, ct)
+        public override BatchConsumeContext<T> Build()
         {
+// #if NET6_0_OR_GREATER
+//             ReadOnlySpan<T> s = CollectionsMarshal.AsSpan(Batch)
+//             var ia = s.ToImmutableArray();
+//             return new BatchConsumeContext<T>(Batch);
+// #else
+//             return new BatchConsumeContext<T>(Batch.ToImmutableArray());
+// #endif
+             return new BatchConsumeContext<T>(Batch);
         }
-
-        public override BatchConsumeContext<T> Build() => new(Batch);
     }
 
+    // TODO ImmutableArray
     public readonly IReadOnlyList<ConsumeContext<T>> Messages;
 
     internal BatchConsumeContext(IReadOnlyList<ConsumeContext<T>> messages)
@@ -72,6 +82,22 @@ public readonly record struct BatchConsumeContext<T>
 
     public BatchConsumeContext<TOut> Transform<TOut>(IEnumerable<ConsumeContext<TOut>> payload) =>
         Transform(payload.ToArray());
+
+    public BatchConsumeContext<TOut> Transform<TOut>(IEnumerable<TOut> batchPayload) =>
+        Transform(Messages.Zip(batchPayload, (message, payload) => message.Transform(payload)));
+
+    public BatchConsumeContext<TOut> Transform<TOut>(Func<ConsumeContext<T>, TOut> transform)
+    {
+        // TODO Parallel LINQ
+        var messages = Messages.Select(transform);
+        return Transform(messages);
+    }
+
+    public async Task<BatchConsumeContext<TOut>> Transform<TOut>(Func<ConsumeContext<T>, Task<TOut>> transform)
+    {
+        var messages = await Task.WhenAll(Messages.Select(transform));
+        return Transform(messages);
+    }
 
     internal KafkaTopicClient Client => Messages[^1].Client;
 

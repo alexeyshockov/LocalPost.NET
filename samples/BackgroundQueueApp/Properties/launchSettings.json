@@ -9,7 +9,6 @@
       "applicationUrl": "https://localhost:7003;http://localhost:5103",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "AWS_PROFILE": "kw-test"
       }
     }
   }

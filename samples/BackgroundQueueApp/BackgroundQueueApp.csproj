@@ -2,13 +2,17 @@
 
     <PropertyGroup>
         <TargetFramework>net8</TargetFramework>
-        <Nullable>enable</Nullable>
-        <ImplicitUsings>enable</ImplicitUsings>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+        <AssemblyAttribute Include="System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute" />
+    </ItemGroup>
 
+    <ItemGroup>
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\..\src\LocalPost\LocalPost.csproj" />
         <ProjectReference Include="..\..\src\LocalPost.Polly\LocalPost.Polly.csproj" />
     </ItemGroup>

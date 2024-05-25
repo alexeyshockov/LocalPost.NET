@@ -8,16 +8,18 @@ internal queue, so `Consume()` calls will return faster.
 
 Because of this behavior, there is no need to maintain our own in memory queue (channel).
 
+## Concurrent processing
 
+A Kafka consumer is designed to handle messages _from one partition_ sequentially, as it commits the offset of the last
+processed message.
 
+One of the common ways to speed up things (increase throughput) is to have multiple partitions for a topic and multiple
+parallel consumers.
 
+Another way is to batch process messages.
 
+## Message key ignorance
 
-
-
-
-## Immutability (actually lack of it)
-
-Because Kafka messages are meant to be processed sequentially (parallelism is achieved by having multiple
-partitions / consumers), `ConsumeContext`/`BatchConsumeContext` objects are not immutable and are reused for each
-handler's call.
+Kafka's message key is used for almost one and only one purpose: to determine the partition for the message, when
+publishing. And in almost all the cases this information is also available (serialized) in the message itself
+(message value in Kafka terms). That's why we are ignoring the message key in this consumer.

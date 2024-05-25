@@ -8,7 +8,7 @@ namespace LocalPost.SqsConsumer;
 internal static class ConsumeContext
 {
     public static BatchBuilderFactory<ConsumeContext<string>, BatchConsumeContext<string>> BatchBuilder(
-        BatchSize batchMaxSizeSize, TimeSpan timeWindow) => ct =>
+        MaxSize batchMaxSizeSize, TimeSpan timeWindow) => ct =>
         new BatchConsumeContext<string>.Builder(batchMaxSizeSize, timeWindow, ct);
 }
 
@@ -62,20 +62,20 @@ public readonly record struct ConsumeContext<T>
 [PublicAPI]
 public readonly record struct BatchConsumeContext<T>
 {
-    internal sealed class Builder : BoundedBatchBuilderBase<ConsumeContext<T>, BatchConsumeContext<T>>
+    internal sealed class Builder(MaxSize batchMaxSize, TimeSpan timeWindow, CancellationToken ct = default)
+        : BoundedBatchBuilderBase<ConsumeContext<T>, BatchConsumeContext<T>>(batchMaxSize, timeWindow, ct)
     {
-        public Builder(BatchSize batchMaxSizeSize, TimeSpan timeWindow, CancellationToken ct = default) :
-            base(batchMaxSizeSize, timeWindow, ct)
-        {
-        }
-
         public override BatchConsumeContext<T> Build() => new(Batch);
     }
 
+    // TODO ImmutableArray
     public readonly IReadOnlyList<ConsumeContext<T>> Messages;
 
     internal BatchConsumeContext(IReadOnlyList<ConsumeContext<T>> messages)
     {
+        if (messages.Count == 0)
+            throw new ArgumentException("Batch must contain at least one message", nameof(messages));
+
         Messages = messages;
     }
 

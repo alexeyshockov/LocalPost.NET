@@ -6,49 +6,48 @@ using Microsoft.Extensions.Options;
 namespace LocalPost.SqsConsumer.DependencyInjection;
 
 [PublicAPI]
-public sealed class SqsBuilder : OptionsBuilder<EndpointOptions>
+public sealed class SqsBuilder(IServiceCollection services)
 {
-    internal SqsBuilder(IServiceCollection services, string? name) : base(services, name)
-    {
-    }
+    // public IServiceCollection Services { get; }
 
-    public OptionsBuilder<Options> AddConsumer(string name, HandlerFactory<ConsumeContext<string>> configure)
+    public OptionsBuilder<EndpointOptions> Defaults { get; } = services.AddOptions<EndpointOptions>();
+
+    public OptionsBuilder<Options> AddConsumer(string name, HandlerFactory<ConsumeContext<string>> hf)
     {
-        if (string.IsNullOrEmpty(name)) // TODO Just default empty name...
+        if (string.IsNullOrEmpty(name))
             throw new ArgumentException("A proper (non empty) name is required", nameof(name));
 
-        // Services.AddSingleton<AcknowledgeMiddleware>();
+        if (!services.TryAddQueueClient<Options>(name))
+            // return ob; // Already added, don't register twice
+            throw new InvalidOperationException("SQS consumer is already registered");
 
-        if (!Services.TryAddQueueClient<Options>(name))
-            throw new ArgumentException("SQS consumer is already registered", nameof(name));
-
-        Services.TryAddNamedSingleton(name, provider =>
+        services.TryAddNamedSingleton(name, provider =>
             new MessageSource(provider.GetRequiredService<QueueClient>(name)));
-        Services.AddBackgroundServiceForNamed<MessageSource>(name);
+        services.AddBackgroundServiceForNamed<MessageSource>(name);
 
-        Services.TryAddConsumerGroup<ConsumeContext<string>, MessageSource>(name, configure);
-
-        return Services.AddOptions<Options>(name).Configure<IOptionsMonitor<EndpointOptions>>((options, commonConfigs) =>
+        services.TryAddBackgroundConsumer<ConsumeContext<string>, MessageSource>(name, hf, provider =>
         {
-            var commonConfig = commonConfigs.Get(Name);
+            var options = provider.GetOptions<Options>(name);
+            return new ConsumerOptions(options.MaxConcurrency, options.BreakOnException);
+        });
 
-            options.UpdateFrom(commonConfig);
+        return services.AddOptions<Options>(name).Configure<IOptions<EndpointOptions>>((options, commonConfig) =>
+        {
+            options.UpdateFrom(commonConfig.Value);
             options.QueueName = name;
         });
     }
 
-    public OptionsBuilder<BatchedOptions> AddBatchConsumer(string name,
-        HandlerFactory<BatchConsumeContext<string>> configure)
+    public OptionsBuilder<BatchedOptions> AddBatchConsumer(string name, HandlerFactory<BatchConsumeContext<string>> hf)
     {
-        if (string.IsNullOrEmpty(name)) // TODO Just default empty name...
+        if (string.IsNullOrEmpty(name))
             throw new ArgumentException("A proper (non empty) name is required", nameof(name));
 
-        // Services.AddSingleton<AcknowledgeMiddleware>();
+        if (!services.TryAddQueueClient<BatchedOptions>(name))
+            // return ob; // Already added, don't register twice
+            throw new InvalidOperationException("SQS consumer is already registered");
 
-        if (!Services.TryAddQueueClient<BatchedOptions>(name))
-            throw new ArgumentException("SQS consumer is already registered", nameof(name));
-
-        Services.TryAddNamedSingleton(name, provider =>
+        services.TryAddNamedSingleton(name, provider =>
         {
             var options = provider.GetOptions<BatchedOptions>(name);
 
@@ -56,17 +55,19 @@ public sealed class SqsBuilder : OptionsBuilder<EndpointOptions>
                 ConsumeContext.BatchBuilder(
                     options.BatchMaxSize, TimeSpan.FromMilliseconds(options.BatchTimeWindowMilliseconds)));
         });
-        Services.AddBackgroundServiceForNamed<BatchMessageSource>(name);
+        services.AddBackgroundServiceForNamed<BatchMessageSource>(name);
 
-        Services.TryAddConsumerGroup<BatchConsumeContext<string>, BatchMessageSource>(name, configure);
-//        Services.TryAddConsumerGroup(name, provider => BackgroundQueue.ConsumerGroupFor(
-//            provider.GetRequiredService<BatchMessageSource>(name), configure(provider), 1));
-
-        return Services.AddOptions<BatchedOptions>(name).Configure<IOptionsMonitor<EndpointOptions>>((options, commonConfigs) =>
+        // services.TryAddConsumerGroup<BatchConsumeContext<string>, BatchMessageSource>(name, hf,
+        //     ConsumerOptions.From<BatchedOptions>(o => new ConsumerOptions(o.MaxConcurrency, o.BreakOnException)));
+        services.TryAddBackgroundConsumer<BatchConsumeContext<string>, BatchMessageSource>(name, hf, provider =>
         {
-            var commonConfig = commonConfigs.Get(Name);
+            var options = provider.GetOptions<BatchedOptions>(name);
+            return new ConsumerOptions(options.MaxConcurrency, options.BreakOnException);
+        });
 
-            options.UpdateFrom(commonConfig);
+        return services.AddOptions<BatchedOptions>(name).Configure<IOptions<EndpointOptions>>((options, commonConfig) =>
+        {
+            options.UpdateFrom(commonConfig.Value);
             options.QueueName = name;
         });
     }

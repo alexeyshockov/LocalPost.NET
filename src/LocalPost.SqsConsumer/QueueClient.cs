@@ -68,7 +68,7 @@ internal sealed class QueueClient : INamedService
         }
     }
 
-    public async Task<IEnumerable<ConsumeContext<string>>> PullMessagesAsync(CancellationToken ct)
+    public async Task<IEnumerable<Message>> PullMessagesAsync(CancellationToken ct)
     {
         using var activity = SqsActivitySource.StartReceiving(this);
 
@@ -88,7 +88,7 @@ internal sealed class QueueClient : INamedService
 
         activity?.SetTagsFor(response);
 
-        return response.Messages.Select(message => new ConsumeContext<string>(this, message, message.Body));
+        return response.Messages;
 
         // TODO Log failures?..
 

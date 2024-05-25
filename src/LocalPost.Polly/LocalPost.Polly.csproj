@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>netstandard2.0</TargetFramework>
+        <TargetFrameworks>netstandard2.0;net6.0;net8.0</TargetFrameworks>
         <IsPackable>true</IsPackable>
         <!-- See https://docs.microsoft.com/en-us/nuget/create-packages/creating-a-package-dotnet-cli -->
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
@@ -41,9 +41,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Polly.Core" Version="8.0.0" />
-        <PackageReference Include="Polly.Extensions" Version="8.0.0" />
+        <PackageReference Include="Polly.Core" Version="8.2.0" />
+        <PackageReference Include="Polly.Extensions" Version="8.2.0" />
+    </ItemGroup>
 
+    <ItemGroup>
         <PackageReference Include="JetBrains.Annotations" Version="2023.3.0" PrivateAssets="All" />
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.*" PrivateAssets="All" />
         <PackageReference Include="GitVersion.MsBuild" Version="5.*" PrivateAssets="All" />

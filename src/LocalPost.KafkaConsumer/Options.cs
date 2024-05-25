@@ -5,35 +5,32 @@ using JetBrains.Annotations;
 namespace LocalPost.KafkaConsumer;
 
 [PublicAPI]
-public record Options
+public class Options : ConsumerConfig
 {
-    /// <summary>
-    ///     Group ID, auth and other options should be set directly.
-    /// </summary>
-    public ConsumerConfig Kafka { get; set; } = new()
+    public Options()
     {
-        EnableAutoOffsetStore = false, // We will store offsets manually, see ConsumeContext class
-    };
+        EnableAutoOffsetStore = false; // We will store offsets manually, see Acknowledge middleware
+    }
 
     [Required] public string Topic { get; set; } = null!;
 
-    // TODO Implement (via ApplicationLifecycle)
-//    public bool ShutdownAppOnFatalError { get; set; } = true;
+    /// <summary>
+    ///     Stop the consumer in case of an exception in the handler, or just log it and continue the processing loop.
+    ///     Default is true.
+    /// </summary>
+    public bool BreakOnException { get; set; } = true;
 
-    // Implement later?..
-//    /// <summary>
-//    ///     How many (parallel) consumers to spawn.
-//    /// </summary>
-//    [Range(1, 10)]
-//    public byte Instances { get; set; } = 1;
+    internal void EnrichFrom(Config config)
+    {
+        foreach (var kv in config)
+            Set(kv.Key, kv.Value);
+    }
 }
 
 [PublicAPI]
-public record BatchedOptions : Options
+public class BatchedOptions : Options
 {
-    [Range(1, ushort.MaxValue)]
-    public ushort BatchMaxSize { get; set; } = 100;
+    [Range(1, ushort.MaxValue)] public ushort BatchMaxSize { get; set; } = 100;
 
-    [Range(1, ushort.MaxValue)]
-    public int BatchTimeWindowMilliseconds { get; set; } = 1_000;
+    [Range(1, ushort.MaxValue)] public int BatchTimeWindowMilliseconds { get; set; } = 1_000;
 }

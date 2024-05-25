@@ -4,16 +4,19 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LocalPost.SqsConsumer.DependencyInjection;
 
-public static class ServiceHealthCheckRegistration
+public static class HealthChecksBuilderEx
 {
+    // TODO AddSqsConsumersLivenessCheck() — simply for all the registered consumers
+
     // Check if the same check is added twice?..
-    public static IHealthChecksBuilder AddKafkaConsumerLivenessCheck(this IHealthChecksBuilder builder,
+
+    public static IHealthChecksBuilder AddSqsConsumerLivenessCheck(this IHealthChecksBuilder builder,
         string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default) => builder
         .Add(HealthChecks.LivenessCheckForNamed<MessageSource>(name, failureStatus, tags))
-        .AddConsumerGroupLivenessCheck<MessageSource, ConsumeContext<string>>();
+        .AddNamedConsumerLivenessCheck<MessageSource, ConsumeContext<string>>(name);
 
-    public static IHealthChecksBuilder AddKafkaBatchConsumerLivenessCheck(this IHealthChecksBuilder builder,
+    public static IHealthChecksBuilder AddSqsBatchConsumerLivenessCheck(this IHealthChecksBuilder builder,
         string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default) => builder
         .Add(HealthChecks.LivenessCheckForNamed<BatchMessageSource>(name, failureStatus, tags))
-        .AddConsumerGroupLivenessCheck<BatchMessageSource, BatchConsumeContext<string>>();
+        .AddNamedConsumerLivenessCheck<BatchMessageSource, BatchConsumeContext<string>>(name);
 }

@@ -10,18 +10,24 @@ namespace LocalPost.SqsConsumer;
 public record EndpointOptions
 {
     // AWS SDK requires List<string>... No way to make it readonly / immutable :(
-    internal static readonly List<string> AllAttributes = new() { "All" };
-    internal static readonly List<string> AllMessageAttributes = new() { "All" };
+    internal static readonly List<string> AllAttributes = ["All"];
+    internal static readonly List<string> AllMessageAttributes = ["All"];
 
     /// <summary>
-    ///     How many messages to process in parallel. Default is 10.
+    ///     How many messages to process concurrently. Default is 10.
     /// </summary>
-    [Required] public ushort MaxConcurrency { get; set; } = 10;
+    public ushort MaxConcurrency { get; set; } = 10;
 
     /// <summary>
-    ///     How many messages to prefetch from the queue. Default is 10.
+    ///     Stop the consumer in case of an exception in the handler, or just log it and continue the processing loop.
+    ///     Default is true.
     /// </summary>
-    public byte Prefetch { get; set; } = 10;
+    public bool BreakOnException { get; set; } = true;
+
+    /// <summary>
+    ///     How many messages to prefetch from SQS. Default is 10.
+    /// </summary>
+    public byte Prefetch { get; set; } = 10; // FIXME Use
 
     /// <summary>
     ///     Time to wait for available messages in the queue. 0 is short pooling, where 1..20 activates long pooling.

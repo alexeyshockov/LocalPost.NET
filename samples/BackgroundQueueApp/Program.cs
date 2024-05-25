@@ -1,7 +1,8 @@
 using BackgroundQueueApp;
 using LocalPost;
+using LocalPost.BackgroundQueues;
+using LocalPost.BackgroundQueues.DependencyInjection;
 using LocalPost.Polly;
-using LocalPost.DependencyInjection;
 using Polly;
 using Polly.Retry;
 
@@ -20,15 +21,19 @@ var resiliencePipeline = new ResiliencePipelineBuilder()
     .Build();
 
 // A background queue with an inline handler
-builder.Services.AddBackgroundQueue(
-    HandlerStack.For<WeatherForecast>(async (weather, ct) =>
+builder.Services.AddBackgroundQueues(bq =>
+    bq.AddQueue(HandlerStack.For<WeatherForecast>(async (weather, ct) =>
         {
             await Task.Delay(TimeSpan.FromSeconds(2), ct);
             Console.WriteLine(weather.Summary);
         })
+        .Scoped()
+        .UsePayload()
+        .Trace()
         .UsePollyPipeline(resiliencePipeline)
-        .LogErrors()
+    )
 );
+
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

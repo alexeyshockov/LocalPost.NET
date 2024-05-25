@@ -35,20 +35,13 @@ internal sealed class BatchMessageSource : MessageSourceBase, IAsyncEnumerable<B
         _source.GetAsyncEnumerator(ct);
 }
 
-internal abstract class MessageSourceBase : IBackgroundService, INamedService
+internal abstract class MessageSourceBase(QueueClient client) : IBackgroundService, INamedService
 {
-    private readonly QueueClient _client;
-
     private bool _stopped;
 
-    protected MessageSourceBase(QueueClient client)
-    {
-        _client = client;
-    }
+    public string Name => client.Name;
 
-    public string Name => _client.Name;
-
-    public async Task StartAsync(CancellationToken ct) => await _client.ConnectAsync(ct);
+    public async Task StartAsync(CancellationToken ct) => await client.ConnectAsync(ct);
 
     public abstract Task ExecuteAsync(CancellationToken ct);
 
@@ -56,17 +49,15 @@ internal abstract class MessageSourceBase : IBackgroundService, INamedService
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         while (!ct.IsCancellationRequested && !_stopped)
-            foreach (var message in await _client.PullMessagesAsync(ct))
-                yield return message;
+            foreach (var message in await client.PullMessagesAsync(ct))
+                yield return new ConsumeContext<string>(client, message, message.Body);
 
         ct.ThrowIfCancellationRequested();
     }
 
-    // Run on a separate thread, as Confluent Kafka API is blocking
     public Task StopAsync(CancellationToken ct)
     {
         _stopped = true;
-//        _client.Close();
 
         return Task.CompletedTask;
     }

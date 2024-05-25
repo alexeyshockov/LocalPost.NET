@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>netstandard2.0</TargetFramework>
+        <TargetFrameworks>netstandard2.0;net6.0;net8.0</TargetFrameworks>
         <IsPackable>true</IsPackable>
         <!-- See https://docs.microsoft.com/en-us/nuget/create-packages/creating-a-package-dotnet-cli -->
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
@@ -42,9 +42,13 @@
 
     <ItemGroup>
         <PackageReference Include="AWSSDK.SQS" Version="[3.7.2,4.0.0)" />
-        <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="6.0.0" />
-        <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="6.0.0" />
+    </ItemGroup>
 
+    <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net6.0'))">
+        <PackageReference Include="System.Text.Json" Version="6.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="JetBrains.Annotations" Version="2023.3.0" PrivateAssets="All" />
         <PackageReference Include="PolySharp" Version="1.14.*" PrivateAssets="All" />
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.*" PrivateAssets="All" />

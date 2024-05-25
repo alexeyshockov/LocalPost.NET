@@ -10,9 +10,10 @@ internal static class ServiceProviderLookups
         where T : INamedService =>
         provider.GetRequiredService<IEnumerable<T>>().First(x => x.Name == name);
 
-    public static T GetOptions<T>(this IServiceProvider provider) => provider.GetOptions<T>(Options.DefaultName);
+    public static T GetOptions<T>(this IServiceProvider provider) where T : class =>
+        provider.GetRequiredService<IOptions<T>>().Value;
 
-    public static T GetOptions<T>(this IServiceProvider provider, string name) =>
+    public static T GetOptions<T>(this IServiceProvider provider, string name) where T : class =>
         provider.GetRequiredService<IOptionsMonitor<T>>().Get(name);
 
     public static ILogger<T> GetLoggerFor<T>(this IServiceProvider provider) =>

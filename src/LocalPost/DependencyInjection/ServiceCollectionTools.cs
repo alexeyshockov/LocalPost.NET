@@ -1,62 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 
 namespace LocalPost.DependencyInjection;
 
-internal static class ConsumerGroupRegistration
-{
-    internal static bool TryAddConsumerGroup<T, TQ>(this IServiceCollection services, string name,
-        HandlerFactory<T> configure) where TQ : IAsyncEnumerable<T>, INamedService
-    {
-//        services.TryAddConsumerGroup(name, provider => BackgroundQueue.ConsumerGroupFor(
-//            provider.GetRequiredService<BatchMessageSource>(name), configure(provider), 1));
-        if (!services.TryAddNamedSingleton(name, provider => BackgroundQueue.ConsumerGroupForNamed(
-                provider.GetRequiredService<TQ>(name), configure(provider), 1))) // FIXME Config
-            return false;
-
-        services.AddBackgroundServiceForNamed<BackgroundQueue.NamedConsumerGroup<TQ, T>>(name);
-
-        return true;
-    }
-
-    internal static bool TryAddConsumerGroup<T, TQ>(this IServiceCollection services,
-        HandlerFactory<T> configure) where TQ : IAsyncEnumerable<T>
-    {
-        if (!services.TryAddSingleton(provider => BackgroundQueue.ConsumerGroupFor(
-                provider.GetRequiredService<TQ>(), configure(provider), 1))) // FIXME Config
-            return false;
-
-        services.AddBackgroundServiceFor<BackgroundQueue.ConsumerGroup<TQ, T>>();
-
-        return true;
-    }
-}
-
-internal static class HealthChecksRegistration
-{
-    public static IHealthChecksBuilder AddConsumerGroupLivenessCheck<TQ, T>(this IHealthChecksBuilder builder,
-        string? name = default, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default)
-        where TQ : IAsyncEnumerable<T>
-    {
-        var check = HealthChecks.LivenessCheckFor<BackgroundQueue.ConsumerGroup<TQ, T>>(failureStatus, tags);
-        if (name is not null)
-            check.Name = name;
-
-        return builder.Add(check);
-    }
-
-    public static IHealthChecksBuilder AddNamedConsumerGroupLivenessCheck<TQ, T>(this IHealthChecksBuilder builder,
-        string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default)
-        where TQ : IAsyncEnumerable<T>, INamedService
-    {
-        var check = HealthChecks.LivenessCheckForNamed<BackgroundQueue.NamedConsumerGroup<TQ, T>>(name, failureStatus, tags);
-
-        return builder.Add(check);
-    }
-}
-
-internal static class Registration
+internal static class ServiceCollectionTools
 {
     public static void AddConcurrentHostedServices(this IServiceCollection services) => services
         .AddHostedService<ConcurrentHostedServices>();
@@ -145,4 +92,15 @@ internal static class Registration
         where TService : class
         where TImplementation : class, TService, INamedService =>
         services.AddSingleton<TService>(provider => provider.GetRequiredService<TImplementation>(name));
+
+    public static bool TryAddSingletonAlias<TService, TImplementation>(this IServiceCollection services)
+        where TService : class
+        where TImplementation : class, TService =>
+        services.TryAddSingleton<TService>(provider => provider.GetRequiredService<TImplementation>());
+
+    public static bool TryAddSingletonAlias<TService, TImplementation>(this IServiceCollection services,
+        string name)
+        where TService : class
+        where TImplementation : class, TService, INamedService =>
+        services.TryAddSingleton<TService>(provider => provider.GetRequiredService<TImplementation>(name));
 }

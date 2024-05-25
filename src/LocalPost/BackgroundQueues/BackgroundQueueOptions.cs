@@ -1,12 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using System.Threading.Channels;
 
-namespace LocalPost;
+namespace LocalPost.BackgroundQueues;
 
-// For the DI container and, to distinguish between different queues
+// For the DI container, to distinguish between different queues
 public sealed record BackgroundQueueOptions<T> : BackgroundQueueOptions;
 
-// For the DI container and, to distinguish between different queues
+// For the DI container, to distinguish between different queues
 public sealed record BatchedBackgroundQueueOptions<T> : BatchedBackgroundQueueOptions;
 
 public record BatchedBackgroundQueueOptions : BackgroundQueueOptions
@@ -32,17 +32,18 @@ public record BackgroundQueueOptions
     public BoundedChannelFullMode FullMode { get; set; } = BoundedChannelFullMode.DropOldest;
 
     /// <summary>
-    ///     Maximum queue (channel) length, after which writes are blocked. Default is unlimited.
+    ///     Maximum queue (channel) length, after which writes are blocked (see <see cref="FullMode" />).
+    ///     Default is unlimited.
     /// </summary>
     public ushort? MaxSize { get; set; } = null;
 
     /// <summary>
     ///     How long to wait before closing the queue (channel) on app shutdown. Default is 1 second.
     /// </summary>
-    public ushort? CompletionTimeout { get; set; } = 1_000; // Milliseconds
+    public ushort CompletionTimeout { get; set; } = 1_000; // Milliseconds
 
     /// <summary>
-    ///     How many messages to process in parallel. Default is 10.
+    ///     How many messages to process concurrently. Default is 10.
     /// </summary>
     [Required] public ushort MaxConcurrency { get; set; } = 10;
 }
