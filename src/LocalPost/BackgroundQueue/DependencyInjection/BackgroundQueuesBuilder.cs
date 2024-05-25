@@ -3,7 +3,7 @@ using LocalPost.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace LocalPost.BackgroundQueues.DependencyInjection;
+namespace LocalPost.BackgroundQueue.DependencyInjection;
 
 [PublicAPI]
 public class BackgroundQueuesBuilder(IServiceCollection services)

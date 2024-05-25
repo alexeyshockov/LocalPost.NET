@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 
-namespace LocalPost.BackgroundQueues;
+namespace LocalPost.BackgroundQueue;
 
 internal static class Tracing
 {

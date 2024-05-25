@@ -1,7 +1,7 @@
 using System.Threading.Channels;
 using LocalPost.AsyncEnumerable;
 
-namespace LocalPost.BackgroundQueues;
+namespace LocalPost.BackgroundQueue;
 
 internal static class BackgroundQueue
 {

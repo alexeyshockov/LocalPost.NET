@@ -3,7 +3,7 @@ using LocalPost.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace LocalPost.BackgroundQueues.DependencyInjection;
+namespace LocalPost.BackgroundQueue.DependencyInjection;
 
 
 [PublicAPI]

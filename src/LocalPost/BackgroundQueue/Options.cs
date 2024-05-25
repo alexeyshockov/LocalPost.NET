@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Threading.Channels;
 
-namespace LocalPost.BackgroundQueues;
+namespace LocalPost.BackgroundQueue;
 
 // For the DI container, to distinguish between different queues
 public sealed record Options<T> : Options;

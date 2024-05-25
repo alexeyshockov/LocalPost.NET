@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using JetBrains.Annotations;
 
-namespace LocalPost.BackgroundQueues;
+namespace LocalPost.BackgroundQueue;
 
 [PublicAPI]
 public static class HandlerStackEx

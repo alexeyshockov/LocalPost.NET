@@ -1,7 +1,7 @@
 using JetBrains.Annotations;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace LocalPost.BackgroundQueues.DependencyInjection;
+namespace LocalPost.BackgroundQueue.DependencyInjection;
 
 [PublicAPI]
 public static class ServiceCollectionEx

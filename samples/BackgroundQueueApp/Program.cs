@@ -1,7 +1,7 @@
 using BackgroundQueueApp;
 using LocalPost;
-using LocalPost.BackgroundQueues;
-using LocalPost.BackgroundQueues.DependencyInjection;
+using LocalPost.BackgroundQueue;
+using LocalPost.BackgroundQueue.DependencyInjection;
 using LocalPost.Polly;
 using Polly;
 using Polly.Retry;

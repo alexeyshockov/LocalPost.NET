@@ -1,6 +1,6 @@
 using JetBrains.Annotations;
 
-namespace LocalPost.BackgroundQueues;
+namespace LocalPost.BackgroundQueue;
 
 // Just a proxy to the actual queue, needed to expose IBackgroundJobQueue
 [UsedImplicitly]
