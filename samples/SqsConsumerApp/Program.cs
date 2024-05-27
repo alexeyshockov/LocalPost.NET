@@ -5,43 +5,46 @@ using LocalPost.SqsConsumer.DependencyInjection;
 using Serilog;
 using Serilog.Sinks.FingersCrossed;
 
-await Host.CreateDefaultBuilder(args)
-    .UseSerilog()
-    .ConfigureServices((context, services) => services
-        .AddDefaultAWSOptions(context.Configuration.GetAWSOptions())
-        .AddAWSService<IAmazonSQS>())
-    .ConfigureServices(services => services
-        .AddScoped<MessageHandler>()
-        .AddSqsConsumers(sqs =>
-        {
-            sqs.Defaults.Configure(options => options.MaxConcurrency = 100);
-            sqs.AddConsumer("weather-forecasts",
-                HandlerStack.From<MessageHandler, WeatherForecast>()
-                    .UseSqsPayload()
-                    .DeserializeJson()
-                    .Acknowledge()
-                    .Scoped()
-                    .Touch(next => async (context, ct) =>
+var builder = Host.CreateApplicationBuilder(args);
+
+builder.Services
+    .AddSerilog()
+    .AddDefaultAWSOptions(builder.Configuration.GetAWSOptions())
+    .AddAWSService<IAmazonSQS>();
+builder.Services
+    .AddScoped<MessageHandler>()
+    .AddSqsConsumers(sqs =>
+    {
+        sqs.Defaults.Configure(options => options.MaxConcurrency = 100);
+        sqs.AddConsumer("weather-forecasts",
+            HandlerStack.From<MessageHandler, WeatherForecast>()
+                .UseSqsPayload()
+                .DeserializeJson()
+                .Acknowledge()
+                .Scoped()
+                .Touch(next => async (context, ct) =>
+                {
+                    using var logBuffer = LogBuffer.BeginScope();
+                    try
                     {
-                        using var logBuffer = LogBuffer.BeginScope();
-                        try
-                        {
-                            await next(context, ct);
-                        }
-                        catch (OperationCanceledException e) when (e.CancellationToken == ct)
-                        {
-                            throw; // Not a real error
-                        }
-                        catch (Exception)
-                        {
-                            logBuffer.Flush();
-                            throw;
-                        }
-                    })
-                    .Trace());
-        }))
-    .Build()
-    .RunAsync();
+                        await next(context, ct);
+                    }
+                    catch (OperationCanceledException e) when (e.CancellationToken == ct)
+                    {
+                        throw; // Not a real error
+                    }
+                    catch (Exception)
+                    {
+                        logBuffer.Flush();
+                        throw;
+                    }
+                })
+                .Trace());
+    });
+
+await builder.Build().RunAsync();
+
+
 
 public record WeatherForecast(int TemperatureC, int TemperatureF, string Summary);
 
