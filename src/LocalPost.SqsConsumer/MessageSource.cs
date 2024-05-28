@@ -6,11 +6,11 @@ namespace LocalPost.SqsConsumer;
 
 internal sealed class MessageSource : MessageSourceBase, IAsyncEnumerable<ConsumeContext<string>>
 {
-    private readonly ConcurrentAsyncEnumerable<ConsumeContext<string>> _source;
+    private readonly ConcurrentBuffer<ConsumeContext<string>> _source;
 
-    public MessageSource(QueueClient client) : base(client)
+    public MessageSource(QueueClient client, int prefetch) : base(client)
     {
-        _source = ConsumeAsync().ToConcurrent();
+        _source = ConsumeAsync().ToConcurrentBuffer(prefetch);
     }
 
     public override async Task ExecuteAsync(CancellationToken ct) => await _source.Run(ct);
@@ -21,12 +21,13 @@ internal sealed class MessageSource : MessageSourceBase, IAsyncEnumerable<Consum
 
 internal sealed class BatchMessageSource : MessageSourceBase, IAsyncEnumerable<BatchConsumeContext<string>>
 {
-    private readonly ConcurrentAsyncEnumerable<BatchConsumeContext<string>> _source;
+    private readonly ConcurrentBuffer<BatchConsumeContext<string>> _source;
 
+    // TODO Make a note that Prefetch does not play a role here, with batch processing...
     public BatchMessageSource(QueueClient client,
         BatchBuilderFactory<ConsumeContext<string>, BatchConsumeContext<string>> factory) : base(client)
     {
-        _source = ConsumeAsync().Batch(factory).ToConcurrent();
+        _source = ConsumeAsync().Batch(factory).ToConcurrentBuffer();
     }
 
     public override async Task ExecuteAsync(CancellationToken ct) => await _source.Run(ct);

@@ -11,11 +11,10 @@ public sealed record BatchedOptions<T> : BatchedOptions;
 
 public record BatchedOptions : Options
 {
-    [Range(1, ushort.MaxValue)]
-    public ushort BatchMaxSize { get; set; } = 10;
+    [Range(1, ushort.MaxValue)] public ushort BatchMaxSize { get; set; } = 10;
 
-    [Range(1, ushort.MaxValue)]
-    public int BatchTimeWindowMilliseconds { get; set; } = 1_000;
+    // TODO Rename to BatchTimeWindowMs
+    [Range(1, ushort.MaxValue)] public int BatchTimeWindowMilliseconds { get; set; } = 1_000;
 
     internal TimeSpan BatchTimeWindow => TimeSpan.FromMilliseconds(BatchTimeWindowMilliseconds);
 }
@@ -35,6 +34,7 @@ public record Options
     ///     Maximum queue (channel) length, after which writes are blocked (see <see cref="FullMode" />).
     ///     Default is unlimited.
     /// </summary>
+    [Range(1, ushort.MaxValue)]
     public ushort? MaxSize { get; set; } = null;
 
     /// <summary>
@@ -45,5 +45,7 @@ public record Options
     /// <summary>
     ///     How many messages to process concurrently. Default is 10.
     /// </summary>
-    [Required] public ushort MaxConcurrency { get; set; } = 10;
+    [Required]
+    [Range(1, ushort.MaxValue)]
+    public ushort MaxConcurrency { get; set; } = 10;
 }

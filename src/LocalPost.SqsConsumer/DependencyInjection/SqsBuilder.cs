@@ -21,8 +21,10 @@ public sealed class SqsBuilder(IServiceCollection services)
             // return ob; // Already added, don't register twice
             throw new InvalidOperationException("SQS consumer is already registered");
 
-        services.TryAddNamedSingleton(name, provider =>
-            new MessageSource(provider.GetRequiredService<QueueClient>(name)));
+        services.TryAddNamedSingleton(name, provider => new MessageSource(
+            provider.GetRequiredService<QueueClient>(name),
+            provider.GetOptions<Options>(name).Prefetch
+        ));
         services.AddBackgroundServiceForNamed<MessageSource>(name);
 
         services.TryAddBackgroundConsumer<ConsumeContext<string>, MessageSource>(name, hf, provider =>

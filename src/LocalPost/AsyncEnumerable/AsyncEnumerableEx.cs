@@ -2,9 +2,8 @@ namespace LocalPost.AsyncEnumerable;
 
 internal static class AsyncEnumerableEx
 {
-    // TODO Better name...
-    public static ConcurrentAsyncEnumerable<T> ToConcurrent<T>(this IAsyncEnumerable<T> source,
-        MaxSize bufferMaxSize = default) => new(source, bufferMaxSize);
+    public static ConcurrentBuffer<T> ToConcurrentBuffer<T>(this IAsyncEnumerable<T> source, int maxSize = 1) =>
+        new(source, maxSize);
 
     public static IAsyncEnumerable<TOut> Batch<T, TOut>(this IAsyncEnumerable<T> source,
         BatchBuilderFactory<T, TOut> factory) => new BatchingAsyncEnumerable<T, TOut>(source, factory);

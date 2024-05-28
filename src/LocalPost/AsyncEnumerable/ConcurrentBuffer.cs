@@ -2,7 +2,7 @@ using System.Threading.Channels;
 
 namespace LocalPost.AsyncEnumerable;
 
-internal sealed class ConcurrentAsyncEnumerable<T>(IAsyncEnumerable<T> source, MaxSize bufferMaxSize)
+internal sealed class ConcurrentBuffer<T>(IAsyncEnumerable<T> source, MaxSize bufferMaxSize)
     : IAsyncEnumerable<T>
 {
     private readonly Channel<T> _buffer = Channel.CreateBounded<T>(new BoundedChannelOptions(bufferMaxSize)

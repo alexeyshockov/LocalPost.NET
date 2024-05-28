@@ -6,11 +6,11 @@ namespace LocalPost.KafkaConsumer;
 
 internal sealed class MessageSource : MessageSourceBase, IAsyncEnumerable<ConsumeContext<byte[]>>
 {
-    private readonly ConcurrentAsyncEnumerable<ConsumeContext<byte[]>> _source;
+    private readonly ConcurrentBuffer<ConsumeContext<byte[]>> _source;
 
     public MessageSource(KafkaTopicClient client) : base(client)
     {
-        _source = ConsumeAsync().ToConcurrent();
+        _source = ConsumeAsync().ToConcurrentBuffer();
     }
 
     public override async Task ExecuteAsync(CancellationToken ct) => await _source.Run(ct);
@@ -21,12 +21,12 @@ internal sealed class MessageSource : MessageSourceBase, IAsyncEnumerable<Consum
 
 internal sealed class BatchMessageSource : MessageSourceBase, IAsyncEnumerable<BatchConsumeContext<byte[]>>
 {
-    private readonly ConcurrentAsyncEnumerable<BatchConsumeContext<byte[]>> _source;
+    private readonly ConcurrentBuffer<BatchConsumeContext<byte[]>> _source;
 
     public BatchMessageSource(KafkaTopicClient client,
         BatchBuilderFactory<ConsumeContext<byte[]>, BatchConsumeContext<byte[]>> factory) : base(client)
     {
-        _source = ConsumeAsync().Batch(factory).ToConcurrent();
+        _source = ConsumeAsync().Batch(factory).ToConcurrentBuffer();
     }
 
     public override async Task ExecuteAsync(CancellationToken ct) => await _source.Run(ct);
@@ -35,24 +35,17 @@ internal sealed class BatchMessageSource : MessageSourceBase, IAsyncEnumerable<B
         _source.GetAsyncEnumerator(ct);
 }
 
-internal abstract class MessageSourceBase : IBackgroundService, INamedService
+internal abstract class MessageSourceBase(KafkaTopicClient client) : IBackgroundService, INamedService
 {
-    private readonly KafkaTopicClient _client;
-
     private bool _stopped;
 
     // Some additional reading: https://devblogs.microsoft.com/premier-developer/the-danger-of-taskcompletionsourcet-class/
 //    private readonly TaskCompletionSource<bool> _executionTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    protected MessageSourceBase(KafkaTopicClient client)
-    {
-        _client = client;
-    }
-
-    public string Name => _client.Name;
+    public string Name => client.Name;
 
     // Run on a separate thread, as Confluent Kafka API is blocking
-    public Task StartAsync(CancellationToken ct) => Task.Run(() => _client.Subscribe(), ct);
+    public Task StartAsync(CancellationToken ct) => Task.Run(client.Subscribe, ct);
 
     public abstract Task ExecuteAsync(CancellationToken ct);
 
@@ -72,7 +65,7 @@ internal abstract class MessageSourceBase : IBackgroundService, INamedService
         // TODO Transaction activity...
 
         while (!ct.IsCancellationRequested && !_stopped)
-            yield return _client.Read(ct);
+            yield return client.Read(ct);
 
         ct.ThrowIfCancellationRequested();
     }
@@ -81,6 +74,6 @@ internal abstract class MessageSourceBase : IBackgroundService, INamedService
     public Task StopAsync(CancellationToken ct) => Task.Run(() =>
     {
         _stopped = true;
-        _client.Close();
+        client.Close();
     }, ct);
 }

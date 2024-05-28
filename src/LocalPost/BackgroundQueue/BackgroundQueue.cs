@@ -39,7 +39,7 @@ internal static class BackgroundQueue
 
         var pipeline = configure(channel.Reader);
         if (proxy)
-            pipeline = pipeline.ToConcurrent();
+            pipeline = pipeline.ToConcurrentBuffer();
 
         return new BackgroundQueue<T, TOut>(channel, pipeline,
             TimeSpan.FromMilliseconds(options.CompletionDelay));
@@ -81,7 +81,7 @@ internal sealed class BackgroundQueue<T, TOut>(
 
     public Task ExecuteAsync(CancellationToken ct) => pipeline switch
     {
-        ConcurrentAsyncEnumerable<TOut> concurrent => concurrent.Run(ct),
+        ConcurrentBuffer<TOut> concurrent => concurrent.Run(ct),
         _ => Task.CompletedTask
     };
 

@@ -14,7 +14,10 @@
         <PackageReference Include="NSubstitute" Version="5.*" />
         <PackageReference Include="NSubstitute.Analyzers.CSharp" Version="1.*" />
 
-        <PackageReference Include="Testcontainers.Kafka" Version="3.*" />
+<!--        <PackageReference Include="Testcontainers.Kafka" Version="3.*" />-->
+        <PackageReference Include="Testcontainers.Redpanda" Version="3.*" />
+
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.*" />
 
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.1.*" />
         <PackageReference Include="xunit" Version="2.4.*" />

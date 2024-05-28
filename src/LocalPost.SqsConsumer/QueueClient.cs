@@ -6,29 +6,17 @@ using Microsoft.Extensions.Options;
 
 namespace LocalPost.SqsConsumer;
 
-internal sealed class QueueClient : INamedService
+internal sealed class QueueClient(ILogger<QueueClient> logger, IAmazonSQS sqs, Options options, string name)
+    : INamedService
 {
-    private readonly ILogger<QueueClient> _logger;
-
-    private readonly IAmazonSQS _sqs;
-    private readonly Options _options;
-
     public QueueClient(ILogger<QueueClient> logger, IAmazonSQS sqs, IOptionsMonitor<Options> options, string name) :
         this(logger, sqs, options.Get(name), name)
     {
     }
 
-    public QueueClient(ILogger<QueueClient> logger, IAmazonSQS sqs, Options options, string name)
-    {
-        _logger = logger;
-        _sqs = sqs;
-        _options = options;
-        Name = name;
-    }
+    public string Name { get; } = name;
 
-    public string Name { get; }
-
-    public string QueueName => _options.QueueName;
+    public string QueueName => options.QueueName;
 
     private GetQueueAttributesResponse? _queueAttributes;
 
@@ -44,9 +32,9 @@ internal sealed class QueueClient : INamedService
 
     public async Task ConnectAsync(CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(_options.QueueUrl))
+        if (string.IsNullOrEmpty(options.QueueUrl))
             // Checking for a possible error in the response would be also good...
-            _queueUrl = (await _sqs.GetQueueUrlAsync(_options.QueueName, ct)).QueueUrl;
+            _queueUrl = (await sqs.GetQueueUrlAsync(options.QueueName, ct)).QueueUrl;
 
         await FetchQueueAttributesAsync(ct);
     }
@@ -56,7 +44,7 @@ internal sealed class QueueClient : INamedService
         try
         {
             // Checking for a possible error in the response would be also good...
-            _queueAttributes = await _sqs.GetQueueAttributesAsync(QueueUrl, EndpointOptions.AllAttributes, ct);
+            _queueAttributes = await sqs.GetQueueAttributesAsync(QueueUrl, EndpointOptions.AllAttributes, ct);
         }
         catch (OperationCanceledException e) when (e.CancellationToken == ct)
         {
@@ -64,7 +52,7 @@ internal sealed class QueueClient : INamedService
         }
         catch (Exception e)
         {
-            _logger.LogWarning(e, "Cannot fetch attributes for SQS {Queue}", _options.QueueName);
+            logger.LogWarning(e, "Cannot fetch attributes for SQS {Queue}", options.QueueName);
         }
     }
 
@@ -77,11 +65,11 @@ internal sealed class QueueClient : INamedService
 
         // AWS SDK handles network failures, see
         // https://docs.aws.amazon.com/sdkref/latest/guide/feature-retry-behavior.html
-        var response = await _sqs.ReceiveMessageAsync(new ReceiveMessageRequest
+        var response = await sqs.ReceiveMessageAsync(new ReceiveMessageRequest
         {
             QueueUrl = QueueUrl,
-            WaitTimeSeconds = _options.WaitTimeSeconds,
-            MaxNumberOfMessages = _options.MaxNumberOfMessages,
+            WaitTimeSeconds = options.WaitTimeSeconds,
+            MaxNumberOfMessages = options.MaxNumberOfMessages,
             AttributeNames = attributeNames,
             MessageAttributeNames = messageAttributeNames,
         }, ct);
@@ -101,7 +89,7 @@ internal sealed class QueueClient : INamedService
     public async Task DeleteMessageAsync<T>(ConsumeContext<T> context)
     {
         using var activity = Tracing.StartSettling(context);
-        await _sqs.DeleteMessageAsync(QueueUrl, context.ReceiptHandle);
+        await sqs.DeleteMessageAsync(QueueUrl, context.ReceiptHandle);
 
         // TODO Log failures?..
     }
@@ -116,7 +104,7 @@ internal sealed class QueueClient : INamedService
             .Select(entries => entries.ToList());
 
         await Task.WhenAll(requests.Select(entries =>
-            _sqs.DeleteMessageBatchAsync(QueueUrl, entries)));
+            sqs.DeleteMessageBatchAsync(QueueUrl, entries)));
 
         // TODO Log failures?..
     }

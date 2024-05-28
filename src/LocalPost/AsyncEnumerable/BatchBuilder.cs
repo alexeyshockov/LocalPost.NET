@@ -117,12 +117,8 @@ internal abstract class BoundedBatchBuilderBase<T, TBatch> : BatchBuilderBase<T,
     }
 }
 
-internal sealed class BoundedBatchBuilder<T> : BoundedBatchBuilderBase<T, IReadOnlyList<T>>
+internal sealed class BoundedBatchBuilder<T>(MaxSize batchMaxSize, TimeSpan timeWindow, CancellationToken ct = default)
+    : BoundedBatchBuilderBase<T, IReadOnlyList<T>>(batchMaxSize, timeWindow, ct)
 {
-    public BoundedBatchBuilder(MaxSize batchMaxSize, TimeSpan timeWindow, CancellationToken ct = default) :
-        base(batchMaxSize, timeWindow, ct)
-    {
-    }
-
     public override IReadOnlyList<T> Build() => Batch;
 }
