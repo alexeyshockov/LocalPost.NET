@@ -3,7 +3,6 @@ using Confluent.Kafka;
 using LocalPost.KafkaConsumer.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Testcontainers.Redpanda;
 using Xunit.Abstractions;
 
 namespace LocalPost.KafkaConsumer.Tests;
@@ -11,80 +10,85 @@ namespace LocalPost.KafkaConsumer.Tests;
 public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
 {
     // Called for each test, since each test instantiates a new class instance
-    private readonly RedpandaContainer _container = new RedpandaBuilder().Build();
+    private readonly RpContainer _container = new RpBuilder()
+        .Build();
+
+    private const string Topic = "weather-forecasts";
 
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
-        output.WriteLine(_container.Id);
-    }
 
-    public Task DisposeAsync() => _container.StopAsync();
-
-    [Fact]
-    public async Task handles_messages()
-    {
-        var hostBuilder = Host.CreateApplicationBuilder();
-        hostBuilder.Services
-            .AddKafkaConsumers(kafka =>
-            {
-                kafka.Defaults.Configure(options =>
-                {
-                    options.BootstrapServers = _container.GetBootstrapAddress();
-                    // options.SecurityProtocol = SecurityProtocol.SaslSsl;
-                    // options.SaslMechanism = SaslMechanism.Plain;
-                    // options.SaslUsername = "admin";
-                    // options.SaslPassword = "";
-                });
-                // kafka.Defaults
-                //     .Bind(builder.Configuration.GetSection("Kafka"))
-                //     .ValidateDataAnnotations();
-                kafka.AddConsumer("weather-forecasts", HandlerStack.For<string>(async (payload, _) =>
-                        {
-                            output.WriteLine(payload);
-                        })
-                        .Map<byte[], string>(next => async (payload, ct) =>
-                        {
-                            // TODO Support string payload out of the box?..
-                            await next(Encoding.UTF8.GetString(payload), ct);
-                        })
-                        .UseKafkaPayload()
-                        .Acknowledge()
-                        .Scoped()
-                        .Trace()
-                    )
-                    .Configure(options =>
-                    {
-                        options.Topic = "weather-forecasts";
-                        options.GroupId = "test-consumer";
-                        // options.AutoOffsetReset = AutoOffsetReset.Earliest;
-                        // options.EnableAutoCommit = false; // TODO DryRun
-                    })
-                    .ValidateDataAnnotations();
-            });
-
-        var host = hostBuilder.Build();
-
-        await host.StartAsync();
+        // Dirty fix, but otherwise the client fails
+        await Task.Delay(3_000);
 
         using var producer = new ProducerBuilder<string, string>(new ProducerConfig
         {
             BootstrapServers = _container.GetBootstrapAddress()
         }).Build();
 
-        await producer.ProduceAsync("weather-forecasts", new Message<string, string>
+        // Redpanda: by default, topic is created automatically on the first message
+        await producer.ProduceAsync(Topic, new Message<string, string>
         {
             Key = "London",
             Value = "It will rainy in London tomorrow"
         });
+        await producer.ProduceAsync(Topic, new Message<string, string>
+        {
+            Key = "Paris",
+            Value = "It will rainy in London tomorrow"
+        });
+    }
 
-        await Task.Delay(1_000);
+    public async Task DisposeAsync()
+    {
+        await _container.StopAsync();
+    }
 
-        Assert.True(true);
+    [Fact]
+    public async Task handles_messages()
+    {
+        var received = new List<string>();
 
-        await host.StopAsync();
+        var hostBuilder = Host.CreateApplicationBuilder();
+        hostBuilder.Services.AddKafkaConsumers(kafka => kafka
+            .AddConsumer("test-one", HandlerStack.For<string>(async (payload, _) =>
+                {
+                    received.Add(payload);
+                })
+                .Map<byte[], string>(next => async (payload, ct) =>
+                {
+                    // TODO Support string payload out of the box?..
+                    await next(Encoding.UTF8.GetString(payload), ct);
+                })
+                .UseKafkaPayload()
+                .Acknowledge()
+                .Scoped()
+                .Trace()
+            )
+            .Configure(options =>
+            {
+                options.BootstrapServers = _container.GetBootstrapAddress();
+                options.Topic = Topic;
+                options.GroupId = "test-app";
+                // Otherwise the client attaches to the end of the topic, skipping all the published messages
+                options.AutoOffsetReset = AutoOffsetReset.Earliest;
+            })
+            .ValidateDataAnnotations());
+
+        var host = hostBuilder.Build();
+
+        try
+        {
+            await host.StartAsync();
+
+            await Task.Delay(1_000); // "App is working"
+
+            Assert.Equal(2, received.Count);
+        }
+        finally
+        {
+            await host.StopAsync();
+        }
     }
 }
-
-
-// public record WeatherForecast(int TemperatureC, int TemperatureF, string Summary);

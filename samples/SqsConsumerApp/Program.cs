@@ -8,7 +8,7 @@ using Serilog.Sinks.FingersCrossed;
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services
-    .AddSerilog()
+    .AddSerilog() // See https://nblumhardt.com/2024/04/serilog-net8-0-minimal/#hooking-up-aspnet-core-and-iloggert
     .AddDefaultAWSOptions(builder.Configuration.GetAWSOptions())
     .AddAWSService<IAmazonSQS>();
 builder.Services
@@ -42,6 +42,7 @@ builder.Services
                 .Trace());
     });
 
+// TODO Health + Supervisor
 await builder.Build().RunAsync();
 
 

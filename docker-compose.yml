@@ -17,6 +17,7 @@ services:
     environment:
       # LocalStack configuration: https://docs.localstack.cloud/references/configuration/
       - DEBUG=${DEBUG:-0}
+      - SERVICES=sqs
     volumes:
       - localstack:/var/lib/localstack
       # https://docs.localstack.cloud/references/init-hooks/
@@ -24,27 +25,28 @@ services:
       # Only needed for Lambdas
 #      - /var/run/docker.sock:/var/run/docker.sock
   redpanda:
-    # https://docs.redpanda.com/current/deploy/deployment-option/self-hosted/docker-image/
+    # Mainly from: https://docs.redpanda.com/redpanda-labs/docker-compose/single-broker/
+    # See also: https://docs.redpanda.com/current/deploy/deployment-option/self-hosted/docker-image/
     image: docker.redpanda.com/redpandadata/redpanda:v24.1.2
+    container_name: redpanda
     command:
       - redpanda start
+      - --mode dev-container
       - --smp 1
-      - --overprovisioned
       - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
       # Address the broker advertises to clients that connect to the Kafka API.
       # Use the internal addresses to connect to the Redpanda brokers
       # from inside the same Docker network.
       # Use the external addresses to connect to the Redpanda brokers
       # from outside the Docker network.
-      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://127.0.0.1:19092
       - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
       # Address the broker advertises to clients that connect to the HTTP Proxy.
-      - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:18082
+      - --advertise-pandaproxy-addr internal://redpanda:8082,external://127.0.0.1:18082
       - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:18081
       # Redpanda brokers use the RPC API to communicate with each other internally.
       - --rpc-addr redpanda:33145
       - --advertise-rpc-addr redpanda:33145
-      - --mode dev-container
     ports:
       - 18081:18081
       - 18082:18082
@@ -54,12 +56,12 @@ services:
       - redpanda:/var/lib/redpanda/data
     networks:
       - redpanda_network
-    healthcheck:
-      test: [ "CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1" ]
-      interval: 15s
-      timeout: 3s
-      retries: 5
-      start_period: 5s
+#    healthcheck:
+#      test: [ "CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1" ]
+#      interval: 15s
+#      timeout: 3s
+#      retries: 5
+#      start_period: 5s
   redpanda-console:
     image: docker.redpanda.com/redpandadata/console:v2.5.2
     entrypoint: /bin/sh

@@ -16,6 +16,9 @@
 
         <PackageReference Include="Testcontainers.LocalStack" Version="3.*" />
 
+        <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.*" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.*" />
+
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.1.*" />
         <PackageReference Include="xunit" Version="2.4.*" />
         <PackageReference Include="xunit.runner.visualstudio" Version="2.4.*" PrivateAssets="All" />

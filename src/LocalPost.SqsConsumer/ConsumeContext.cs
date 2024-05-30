@@ -65,24 +65,23 @@ public readonly record struct BatchConsumeContext<T>
     internal sealed class Builder(MaxSize batchMaxSize, TimeSpan timeWindow, CancellationToken ct = default)
         : BoundedBatchBuilderBase<ConsumeContext<T>, BatchConsumeContext<T>>(batchMaxSize, timeWindow, ct)
     {
-        public override BatchConsumeContext<T> Build() => new(Batch);
+        // TODO Batch.DrainToImmutable()
+        public override BatchConsumeContext<T> Build() => new(Batch.ToImmutable());
     }
 
-    // TODO ImmutableArray
-    public readonly IReadOnlyList<ConsumeContext<T>> Messages;
+    public readonly ImmutableArray<ConsumeContext<T>> Messages;
 
-    internal BatchConsumeContext(IReadOnlyList<ConsumeContext<T>> messages)
+    public int Count => Messages.Length;
+
+    internal BatchConsumeContext(ImmutableArray<ConsumeContext<T>> messages)
     {
-        if (messages.Count == 0)
+        if (messages.Length == 0)
             throw new ArgumentException("Batch must contain at least one message", nameof(messages));
 
         Messages = messages;
     }
 
-    public BatchConsumeContext<TOut> Transform<TOut>(ConsumeContext<TOut>[] payload) => new(payload);
-
-    public BatchConsumeContext<TOut> Transform<TOut>(IEnumerable<ConsumeContext<TOut>> payload) =>
-        Transform(payload.ToArray());
+    public BatchConsumeContext<TOut> Transform<TOut>(IEnumerable<ConsumeContext<TOut>> payload) => new(payload.ToImmutableArray());
 
     public BatchConsumeContext<TOut> Transform<TOut>(IEnumerable<TOut> batchPayload) =>
         Transform(Messages.Zip(batchPayload, (message, payload) => message.Transform(payload)));

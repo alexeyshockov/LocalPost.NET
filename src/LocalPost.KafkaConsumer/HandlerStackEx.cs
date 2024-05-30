@@ -54,7 +54,7 @@ public static class HandlerStackEx
             async (context, ct) =>
             {
                 await next(context, ct);
-                context.Client.StoreOffset(context.Offset);
+                context.Client.StoreOffset(context.NextOffset);
             });
 
     public static HandlerFactory<BatchConsumeContext<T>> Acknowledge<T>(
@@ -63,7 +63,10 @@ public static class HandlerStackEx
             async (context, ct) =>
             {
                 await next(context, ct);
-                context.Client.StoreOffset(context.LatestOffset);
+                // Store all the offsets, as it can be a batch of messages from different partitions
+                // (even different topics, if subscribed using a regex)
+                foreach (var message in context.Messages)
+                    message.Client.StoreOffset(message.NextOffset);
             });
 
     #region Deserialize()

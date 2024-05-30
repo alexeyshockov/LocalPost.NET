@@ -23,14 +23,13 @@ public class BackgroundQueuesBuilder(IServiceCollection services)
     }
 
     // THandler has to be registered by the user
-    public OptionsBuilder<Options<T>> AddQueue<T, THandler>()
-        where THandler : IHandler<T> =>
-        AddQueue(
-            HandlerStack.From<THandler, T>()
-                .Scoped()
-                .UsePayload()
-                .Trace()
-        );
+    public OptionsBuilder<Options<T>> AddQueue<T, THandler>() where THandler : IHandler<T> => AddQueue(
+        // A way to configure the pipeline?..
+        HandlerStack.From<THandler, T>()
+            .Scoped()
+            .UsePayload()
+            .Trace()
+    );
 
     public OptionsBuilder<Options<T>> AddQueue<T>(HandlerFactory<ConsumeContext<T>> hf)
     {

@@ -74,6 +74,7 @@ internal class BackgroundServiceRunner<T>(T service, IHostApplicationLifetime ap
     private Task? _start;
     private CancellationTokenSource? _executionCts;
     private Task? _execution;
+    private Task? _executionWrapper;
 
     public bool Starting => _start is not null && !_start.IsCompleted;
 
@@ -111,16 +112,12 @@ internal class BackgroundServiceRunner<T>(T service, IHostApplicationLifetime ap
         await (_start = service.StartAsync(ct));
 
         // Start execution in the background...
-#pragma warning disable CS4014
-        ExecuteAsync();
-#pragma warning restore CS4014
+        _executionCts = new CancellationTokenSource();
+        _executionWrapper = ExecuteAsync(_executionCts.Token);
     }
 
-    private async Task ExecuteAsync()
+    private async Task ExecuteAsync(CancellationToken ct)
     {
-        _executionCts = new CancellationTokenSource();
-        var ct = _executionCts.Token;
-
         try
         {
             await WaitAppStartAsync(ct);
@@ -148,9 +145,9 @@ internal class BackgroundServiceRunner<T>(T service, IHostApplicationLifetime ap
         if (!_executionCts.IsCancellationRequested)
             _executionCts.Cancel(); // Signal cancellation to the service
 
-        if (_execution is not null)
+        if (_executionWrapper is not null)
             // Wait until the execution completes or the app is forced to exit
-            await _execution.WaitAsync(forceExitToken);
+            await _executionWrapper.WaitAsync(forceExitToken);
 
         await service.StopAsync(forceExitToken);
     }

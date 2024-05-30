@@ -16,11 +16,12 @@ public static class ServiceCollectionEx
     }
 
     internal static bool TryAddKafkaClient<TOptions>(this IServiceCollection services, string name)
-        where TOptions : Options => services.TryAddNamedSingleton(name, provider =>
-    {
-        var options = provider.GetOptions<TOptions>(name);
+        where TOptions : Options =>
+        services.TryAddNamedSingleton(name, provider =>
+        {
+            var options = provider.GetOptions<TOptions>(name);
 
-        return new KafkaTopicClient(provider.GetRequiredService<ILogger<KafkaTopicClient>>(),
-            options, options.Topic, name);
-    });
+            return new KafkaTopicClient(provider.GetRequiredService<ILogger<KafkaTopicClient>>(),
+                options, options.Topic, name);
+        });
 }

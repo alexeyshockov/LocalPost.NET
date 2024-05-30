@@ -57,7 +57,7 @@ internal static class SqsActivityExtensions
         activity?.SetTag("messaging.message.id", context.MessageId);
 
     public static Activity? SetTagsFor<T>(this Activity? activity, BatchConsumeContext<T> context) =>
-        activity?.SetTag("messaging.batch.message_count", context.Messages.Count);
+        activity?.SetTag("messaging.batch.message_count", context.Count);
 
     public static Activity? SetTagsFor(this Activity? activity, ReceiveMessageResponse response) =>
         activity?.SetTag("messaging.batch.message_count", response.Messages.Count);
@@ -130,7 +130,7 @@ internal static class Tracing
             return activity;
 
         activity.SetDefaultTags(context.Client);
-        activity.SetTag("messaging.batch.message_count", context.Messages.Count);
+        activity.SetTag("messaging.batch.message_count", context.Count);
 
         return activity;
     }

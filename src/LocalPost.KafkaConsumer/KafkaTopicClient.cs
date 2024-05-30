@@ -4,6 +4,27 @@ using Microsoft.Extensions.Logging;
 
 namespace LocalPost.KafkaConsumer;
 
+internal static class KafkaLogging
+{
+    public static void LogKafkaMessage(this ILogger logger, string topic, LogMessage log)
+    {
+        var level = log.Level switch
+        {
+            SyslogLevel.Emergency => LogLevel.Critical,
+            SyslogLevel.Alert => LogLevel.Critical,
+            SyslogLevel.Critical => LogLevel.Critical,
+            SyslogLevel.Error => LogLevel.Error,
+            SyslogLevel.Warning => LogLevel.Warning,
+            SyslogLevel.Notice => LogLevel.Information,
+            SyslogLevel.Info => LogLevel.Information,
+            SyslogLevel.Debug => LogLevel.Debug,
+            _ => LogLevel.Information
+        };
+
+        logger.Log(level, "{Topic} (via librdkafka): {Message}", topic, log.Message);
+    }
+}
+
 internal sealed class KafkaTopicClient : INamedService, IDisposable
 {
     private readonly ILogger<KafkaTopicClient> _logger;
@@ -13,9 +34,9 @@ internal sealed class KafkaTopicClient : INamedService, IDisposable
     {
         _logger = logger;
 
-        var clientBuilder = new ConsumerBuilder<Ignore, byte[]>(config);
-        // TODO Error handler, logger
-        _client = clientBuilder.Build();
+        _client = new ConsumerBuilder<Ignore, byte[]>(config)
+            .SetLogHandler((_, log) => _logger.LogKafkaMessage(topic, log))
+            .Build();
 
         Topic = topic;
         GroupId = config.GroupId;
@@ -52,7 +73,9 @@ internal sealed class KafkaTopicClient : INamedService, IDisposable
                 if (result is null || result.IsPartitionEOF || result.Message is null)
                     continue; // Continue waiting for a message
 
-                return new ConsumeContext<byte[]>(this, result.TopicPartitionOffset, result.Message,
+                return new ConsumeContext<byte[]>(this,
+                    new TopicPartitionOffset(result.Topic, result.Partition, result.Offset + 1, result.LeaderEpoch),
+                    result.Message,
                     result.Message.Value);
             }
             catch (ConsumeException e) when (!e.Error.IsFatal)

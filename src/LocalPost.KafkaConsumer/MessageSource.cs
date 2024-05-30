@@ -13,6 +13,7 @@ internal sealed class MessageSource : MessageSourceBase, IAsyncEnumerable<Consum
         _source = ConsumeAsync().ToConcurrentBuffer();
     }
 
+    // Run this (possibly) blocking & long-running task in a separate thread?..
     public override async Task ExecuteAsync(CancellationToken ct) => await _source.Run(ct);
 
     public IAsyncEnumerator<ConsumeContext<byte[]>> GetAsyncEnumerator(CancellationToken ct) =>

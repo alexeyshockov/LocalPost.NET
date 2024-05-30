@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Nito.AsyncEx;
 
 namespace LocalPost.AsyncEnumerable;
@@ -86,14 +87,14 @@ internal abstract class BatchBuilderBase<T, TBatch> : IBatchBuilder<T, TBatch>
 
 internal abstract class BoundedBatchBuilderBase<T, TBatch> : BatchBuilderBase<T, TBatch>
 {
-    private readonly MaxSize _batchMaxSize;
-    protected List<T> Batch; // FIXME ImmutableArrayBuilder
+    private readonly int _batchMaxSize;
+    protected ImmutableArray<T>.Builder Batch;
 
     protected BoundedBatchBuilderBase(MaxSize batchMaxSize, TimeSpan timeWindow, CancellationToken ct = default) :
         base(timeWindow, ct)
     {
         _batchMaxSize = batchMaxSize;
-        Batch = new List<T>(_batchMaxSize);
+        Batch = ImmutableArray.CreateBuilder<T>(_batchMaxSize);
     }
 
     public override bool IsEmpty => Batch.Count == 0;
@@ -113,12 +114,12 @@ internal abstract class BoundedBatchBuilderBase<T, TBatch> : BatchBuilderBase<T,
     public override void Reset()
     {
         base.Reset();
-        Batch = new List<T>(_batchMaxSize);
+        Batch = ImmutableArray.CreateBuilder<T>(_batchMaxSize);
     }
 }
 
 internal sealed class BoundedBatchBuilder<T>(MaxSize batchMaxSize, TimeSpan timeWindow, CancellationToken ct = default)
     : BoundedBatchBuilderBase<T, IReadOnlyList<T>>(batchMaxSize, timeWindow, ct)
 {
-    public override IReadOnlyList<T> Build() => Batch;
+    public override IReadOnlyList<T> Build() => Batch; // TODO ImmutableArray
 }

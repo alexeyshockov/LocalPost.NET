@@ -60,7 +60,7 @@ internal static class KafkaActivityExtensions
     public static Activity? SetTagsFor<T>(this Activity? activity, ConsumeContext<T> context)
     {
         // activity?.SetTag("messaging.message.id", context.MessageId);
-        activity?.SetTag("messaging.kafka.message.offset", context.Offset.Offset.Value);
+        activity?.SetTag("messaging.kafka.message.offset", context.NextOffset.Offset.Value);
 
         // Skip, as we always ignore the key on consumption
         // activity.SetTag("messaging.kafka.message.key", context.Message.Key);

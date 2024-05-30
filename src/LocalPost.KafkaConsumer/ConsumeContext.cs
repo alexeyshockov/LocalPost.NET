@@ -15,15 +15,19 @@ internal static class ConsumeContext
 public readonly record struct ConsumeContext<T>
 {
     internal readonly KafkaTopicClient Client;
-    internal readonly TopicPartitionOffset Offset;
+    // librdkafka docs:
+    //  When consumer restarts this is where it will start consuming from.
+    //  The committed offset should be last_message_offset+1.
+    // See https://github.com/confluentinc/librdkafka/wiki/Consumer-offset-management#terminology
+    internal readonly TopicPartitionOffset NextOffset;
     internal readonly Message<Ignore, byte[]> Message;
     public readonly T Payload;
 
-    internal ConsumeContext(KafkaTopicClient client, TopicPartitionOffset offset, Message<Ignore, byte[]> message,
+    internal ConsumeContext(KafkaTopicClient client, TopicPartitionOffset nextOffset, Message<Ignore, byte[]> message,
         T payload)
     {
         Client = client;
-        Offset = offset;
+        NextOffset = nextOffset;
         Message = message;
         Payload = payload;
     }
@@ -38,7 +42,7 @@ public readonly record struct ConsumeContext<T>
 
     public IReadOnlyList<IHeader> Headers => Message.Headers.BackingList;
 
-    public ConsumeContext<TOut> Transform<TOut>(TOut payload) => new(Client, Offset, Message, payload);
+    public ConsumeContext<TOut> Transform<TOut>(TOut payload) => new(Client, NextOffset, Message, payload);
 
     public ConsumeContext<TOut> Transform<TOut>(Func<ConsumeContext<T>, TOut> transform) => Transform(transform(this));
 
@@ -100,7 +104,4 @@ public readonly record struct BatchConsumeContext<T>
     }
 
     internal KafkaTopicClient Client => Messages[^1].Client;
-
-    // Use .MaxBy() to not rely on the order?..
-    internal TopicPartitionOffset LatestOffset => Messages[^1].Offset;
 }

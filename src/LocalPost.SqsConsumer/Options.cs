@@ -27,7 +27,7 @@ public record EndpointOptions
     /// <summary>
     ///     How many messages to prefetch from SQS. Default is 10.
     /// </summary>
-    public byte Prefetch { get; set; } = 10; // FIXME Use
+    public byte Prefetch { get; set; } = 10;
 
     /// <summary>
     ///     Time to wait for available messages in the queue. 0 is short pooling, where 1..20 activates long pooling.
