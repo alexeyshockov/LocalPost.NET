@@ -2,7 +2,6 @@
 
     <PropertyGroup>
         <TargetFrameworks>net6;net8</TargetFrameworks>
-        <ImplicitUsings>enable</ImplicitUsings>
 
         <IsPackable>false</IsPackable>
     </PropertyGroup>
@@ -14,10 +13,10 @@
         <PackageReference Include="NSubstitute" Version="5.*" />
         <PackageReference Include="NSubstitute.Analyzers.CSharp" Version="1.*" />
 
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.1.*" />
-        <PackageReference Include="xunit" Version="2.4.*" />
-        <PackageReference Include="xunit.runner.visualstudio" Version="2.4.*" PrivateAssets="All" />
-        <PackageReference Include="coverlet.collector" Version="3.1.*" PrivateAssets="All" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
+        <PackageReference Include="xunit" Version="2.*" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="2.*" PrivateAssets="All" />
+        <PackageReference Include="coverlet.collector" Version="6.*" PrivateAssets="All" />
     </ItemGroup>
 
     <ItemGroup>

@@ -84,7 +84,7 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
 
             await Task.Delay(1_000); // "App is working"
 
-            Assert.Equal(2, received.Count);
+            received.Should().HaveCount(2);
         }
         finally
         {

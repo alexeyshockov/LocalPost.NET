@@ -51,7 +51,7 @@
     <ItemGroup>
         <PackageReference Include="JetBrains.Annotations" Version="2023.3.0" PrivateAssets="All" />
         <PackageReference Include="PolySharp" Version="1.14.*" PrivateAssets="All" />
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.*" PrivateAssets="All" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.*" PrivateAssets="All" />
         <PackageReference Include="GitVersion.MsBuild" Version="5.*" PrivateAssets="All" />
     </ItemGroup>
 

@@ -23,16 +23,16 @@ internal interface IBatchBuilder<in T, out TBatch> : IDisposable
 
 internal abstract class BatchBuilderBase<T, TBatch> : IBatchBuilder<T, TBatch>
 {
-    private readonly TimeSpan _timeWindowLength;
+    private readonly TimeSpan _timeWindowDuration;
     private readonly CancellationToken _ct;
 
     private CancellationTokenSource _timeWindow;
     private CancellationTokenTaskSource<bool>? _timeWindowTrigger;
 
-    protected BatchBuilderBase(TimeSpan timeWindow, CancellationToken ct = default)
+    protected BatchBuilderBase(TimeSpan timeWindowDuration, CancellationToken ct = default)
     {
-        _timeWindowLength = timeWindow;
-        _ct = ct; // TODO Rename to globalCancellation or something like that
+        _timeWindowDuration = timeWindowDuration;
+        _ct = ct; // Rename to globalCancellation or something like that...
 
         _timeWindow = StartTimeWindow();
     }
@@ -52,10 +52,10 @@ internal abstract class BatchBuilderBase<T, TBatch> : IBatchBuilder<T, TBatch>
     private CancellationTokenSource StartTimeWindow()
     {
         if (_ct == CancellationToken.None)
-            return new CancellationTokenSource(_timeWindowLength);
+            return new CancellationTokenSource(_timeWindowDuration);
 
         var timeWindow = CancellationTokenSource.CreateLinkedTokenSource(_ct);
-        timeWindow.CancelAfter(_timeWindowLength);
+        timeWindow.CancelAfter(_timeWindowDuration);
 
         return timeWindow;
     }
@@ -90,8 +90,8 @@ internal abstract class BoundedBatchBuilderBase<T, TBatch> : BatchBuilderBase<T,
     private readonly int _batchMaxSize;
     protected ImmutableArray<T>.Builder Batch;
 
-    protected BoundedBatchBuilderBase(MaxSize batchMaxSize, TimeSpan timeWindow, CancellationToken ct = default) :
-        base(timeWindow, ct)
+    protected BoundedBatchBuilderBase(MaxSize batchMaxSize, TimeSpan timeWindowDuration, CancellationToken ct = default) :
+        base(timeWindowDuration, ct)
     {
         _batchMaxSize = batchMaxSize;
         Batch = ImmutableArray.CreateBuilder<T>(_batchMaxSize);
@@ -118,8 +118,8 @@ internal abstract class BoundedBatchBuilderBase<T, TBatch> : BatchBuilderBase<T,
     }
 }
 
-internal sealed class BoundedBatchBuilder<T>(MaxSize batchMaxSize, TimeSpan timeWindow, CancellationToken ct = default)
-    : BoundedBatchBuilderBase<T, IReadOnlyList<T>>(batchMaxSize, timeWindow, ct)
+internal sealed class BoundedBatchBuilder<T>(MaxSize batchMaxSize, TimeSpan timeWindowDuration, CancellationToken ct = default)
+    : BoundedBatchBuilderBase<T, IReadOnlyList<T>>(batchMaxSize, timeWindowDuration, ct)
 {
     public override IReadOnlyList<T> Build() => Batch; // TODO ImmutableArray
 }

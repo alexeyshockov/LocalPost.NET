@@ -68,8 +68,8 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
 
         await Task.Delay(1_000);
 
-        Assert.Single(received);
-        Assert.Equal("It will rainy in London tomorrow", received[0]);
+        received.Should().HaveCount(1);
+        received[0].Should().Be("It will rainy in London tomorrow");
 
         await host.StopAsync();
     }

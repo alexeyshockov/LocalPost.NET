@@ -15,16 +15,11 @@ internal static class AsyncEnumeratorEx
 
         if (completed)
             // Ideally there should be a better way to communicate the completion...
+            // But because it is usually used for long-running enumerators, fine
             throw new EndOfEnumeratorException("Source is empty");
 
         return source.Current;
     }
 }
 
-internal sealed class EndOfEnumeratorException : Exception
-{
-    public EndOfEnumeratorException(string message) : base(message)
-    {
-    }
-}
-
+internal sealed class EndOfEnumeratorException(string message) : Exception(message);

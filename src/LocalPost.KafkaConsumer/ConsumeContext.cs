@@ -55,8 +55,8 @@ public readonly record struct ConsumeContext<T>
 [PublicAPI]
 public readonly record struct BatchConsumeContext<T>
 {
-    internal sealed class Builder(MaxSize batchMaxSize, TimeSpan timeWindow, CancellationToken ct = default)
-        : BoundedBatchBuilderBase<ConsumeContext<T>, BatchConsumeContext<T>>(batchMaxSize, timeWindow, ct)
+    internal sealed class Builder(MaxSize batchMaxSize, TimeSpan timeWindowDuration, CancellationToken ct = default)
+        : BoundedBatchBuilderBase<ConsumeContext<T>, BatchConsumeContext<T>>(batchMaxSize, timeWindowDuration, ct)
     {
         public override BatchConsumeContext<T> Build()
         {

@@ -27,7 +27,7 @@ services:
   redpanda:
     # Mainly from: https://docs.redpanda.com/redpanda-labs/docker-compose/single-broker/
     # See also: https://docs.redpanda.com/current/deploy/deployment-option/self-hosted/docker-image/
-    image: docker.redpanda.com/redpandadata/redpanda:v24.1.2
+    image: docker.redpanda.com/redpandadata/redpanda:v24.1.5
     container_name: redpanda
     command:
       - redpanda start

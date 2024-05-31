@@ -12,7 +12,7 @@ internal sealed class BatchingAsyncEnumerable<T, TOut>(
             TOut completedBatch;
             try
             {
-                var consumeResult = await source.Consume(ct); // FIXME batchBuilder.TimeWindow
+                var consumeResult = await source.Consume(batchBuilder.TimeWindow);
                 var added = batchBuilder.TryAdd(consumeResult);
                 if (!added)
                 {
