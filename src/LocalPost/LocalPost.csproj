@@ -70,16 +70,10 @@
 
     <ItemGroup>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-            <_Parameter1>$(MSBuildProjectName).SnsPublisher</_Parameter1>
-        </AssemblyAttribute>
-        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
             <_Parameter1>$(MSBuildProjectName).SqsConsumer</_Parameter1>
         </AssemblyAttribute>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
             <_Parameter1>$(MSBuildProjectName).KafkaConsumer</_Parameter1>
-        </AssemblyAttribute>
-        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-            <_Parameter1>$(MSBuildProjectName).RabbitMqConsumer</_Parameter1>
         </AssemblyAttribute>
     </ItemGroup>
 

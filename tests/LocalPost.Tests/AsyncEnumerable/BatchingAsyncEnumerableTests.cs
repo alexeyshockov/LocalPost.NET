@@ -16,7 +16,7 @@ public class BatchingAsyncEnumerableTests
             SingleWriter = false
         });
         var results = source.Reader.ReadAllAsync().Batch(
-            (ct) => new BoundedBatchBuilder<int>(10, TimeSpan.FromSeconds(2)));
+            () => new BoundedBatchBuilder<int>(10, TimeSpan.FromSeconds(2)));
 
         async Task Produce()
         {
@@ -35,8 +35,8 @@ public class BatchingAsyncEnumerableTests
         async Task Consume()
         {
             var expect = new Queue<int[]>();
-            expect.Enqueue(new[] { 1, 2, 3 });
-            expect.Enqueue(new[] { 4, 5 });
+            expect.Enqueue([1, 2, 3]);
+            expect.Enqueue([4, 5]);
             await foreach (var batch in results)
             {
                 batch.Should().ContainInOrder(expect.Dequeue());

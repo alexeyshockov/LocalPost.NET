@@ -14,5 +14,5 @@ public static class HealthChecksBuilderEx
 
     public static IHealthChecksBuilder AddBackgroundQueueLivenessCheck<T>(this IHealthChecksBuilder builder,
         HealthStatus? failureStatus = default, IEnumerable<string>? tags = default) => builder
-        .AddConsumerLivenessCheck<BackgroundQueue<T, T>, T>();
+        .AddPipelineLivenessCheck<IBackgroundQueue<T>>();
 }

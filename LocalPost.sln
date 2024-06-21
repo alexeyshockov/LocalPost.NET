@@ -36,6 +36,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost.KafkaConsumer.Tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost.RabbitMqConsumer.Tests", "tests\LocalPost.RabbitMqConsumer.Tests\LocalPost.RabbitMqConsumer.Tests.csproj", "{92461B19-6794-4EB2-BFFE-DCD9CDFFD6D8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost.NatsConsumer", "src\LocalPost.NatsConsumer\LocalPost.NatsConsumer.csproj", "{05A771C9-0987-484A-8A7F-B6B1180F55F9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -110,6 +112,10 @@ Global
 		{92461B19-6794-4EB2-BFFE-DCD9CDFFD6D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{92461B19-6794-4EB2-BFFE-DCD9CDFFD6D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{92461B19-6794-4EB2-BFFE-DCD9CDFFD6D8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{05A771C9-0987-484A-8A7F-B6B1180F55F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05A771C9-0987-484A-8A7F-B6B1180F55F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05A771C9-0987-484A-8A7F-B6B1180F55F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{05A771C9-0987-484A-8A7F-B6B1180F55F9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{46FC61E6-D0FB-4D7D-A81B-20EF8D8D1F4E} = {405721DC-F290-4191-B638-9907D5EB042B}

@@ -1,8 +1,6 @@
-using JetBrains.Annotations;
-
 namespace LocalPost;
 
-[PublicAPI]
+// TODO Remove?..
 public interface IQueuePublisher<in T>
 {
     // TODO Custom exception when closed?.. Or just return true/false?..

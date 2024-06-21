@@ -56,7 +56,7 @@ internal static class SqsActivityExtensions
     public static Activity? SetTagsFor<T>(this Activity? activity, ConsumeContext<T> context) =>
         activity?.SetTag("messaging.message.id", context.MessageId);
 
-    public static Activity? SetTagsFor<T>(this Activity? activity, BatchConsumeContext<T> context) =>
+    public static Activity? SetTagsFor<T>(this Activity? activity, IReadOnlyCollection<ConsumeContext<T>> context) =>
         activity?.SetTag("messaging.batch.message_count", context.Count);
 
     public static Activity? SetTagsFor(this Activity? activity, ReceiveMessageResponse response) =>
@@ -96,14 +96,14 @@ internal static class Tracing
         return activity;
     }
 
-
-    public static Activity? StartProcessing<T>(BatchConsumeContext<T> context)
+    public static Activity? StartProcessing<T>(IReadOnlyCollection<ConsumeContext<T>> context)
     {
-        var activity = Source.StartActivity($"{context.Client.QueueName} process", ActivityKind.Consumer);
+        var client = context.First().Client;
+        var activity = Source.StartActivity($"{client.QueueName} process", ActivityKind.Consumer);
         if (activity is not { IsAllDataRequested: true })
             return activity;
 
-        activity.SetDefaultTags(context.Client);
+        activity.SetDefaultTags(client);
         activity.SetTagsFor(context);
 
         // TODO Accept distributed tracing headers, per each message...
@@ -123,14 +123,15 @@ internal static class Tracing
         return activity;
     }
 
-    public static Activity? StartSettling<T>(BatchConsumeContext<T> context)
+    public static Activity? StartSettling<T>(IReadOnlyCollection<ConsumeContext<T>> context)
     {
-        var activity = Source.StartActivity($"{context.Client.QueueName} settle", ActivityKind.Consumer);
+        var client = context.First().Client;
+        var activity = Source.StartActivity($"{client.QueueName} settle", ActivityKind.Consumer);
         if (activity is not { IsAllDataRequested: true })
             return activity;
 
-        activity.SetDefaultTags(context.Client);
-        activity.SetTag("messaging.batch.message_count", context.Count);
+        activity.SetDefaultTags(client);
+        activity.SetTagsFor(context);
 
         return activity;
     }

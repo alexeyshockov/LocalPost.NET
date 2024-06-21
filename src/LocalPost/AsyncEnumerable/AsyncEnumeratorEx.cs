@@ -10,6 +10,7 @@ internal static class AsyncEnumeratorEx
         var completed = waitTrigger.IsCompleted switch
         {
             true => await waitTrigger,
+            // TODO WaitAsync() from .NET 6+
             _ => await waitTrigger.AsTask().WaitAsync(ct)
         };
 

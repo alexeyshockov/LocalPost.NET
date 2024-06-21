@@ -20,18 +20,18 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
 
     private const string QueueName = "weather-forecasts";
 
-    private IAmazonSQS _sqs;
-
     private string? _queueUrl;
+
+    private IAmazonSQS CreateClient() =>
+        new AmazonSQSClient(new BasicAWSCredentials("LSIAQAAAAAAVNCBMPNSG", "any"),
+            new AmazonSQSConfig { ServiceURL = _container.GetConnectionString() });
 
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
 
-        _sqs = new AmazonSQSClient(new BasicAWSCredentials("LSIAQAAAAAAVNCBMPNSG", "any"),
-            new AmazonSQSConfig { ServiceURL = _container.GetConnectionString() });
-
-        var createResponse = await _sqs.CreateQueueAsync(QueueName);
+        var sqs = CreateClient();
+        var createResponse = await sqs.CreateQueueAsync(QueueName);
         _queueUrl = createResponse.QueueUrl;
     }
 
@@ -64,9 +64,10 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
 
         await host.StartAsync();
 
-        await _sqs.SendMessageAsync(_queueUrl, "It will rainy in London tomorrow");
+        var sqs = CreateClient();
+        await sqs.SendMessageAsync(_queueUrl, "It will rainy in London tomorrow");
 
-        await Task.Delay(1_000);
+        await Task.Delay(1_000); // "App is working"
 
         received.Should().HaveCount(1);
         received[0].Should().Be("It will rainy in London tomorrow");

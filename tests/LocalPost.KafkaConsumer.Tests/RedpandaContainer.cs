@@ -7,9 +7,9 @@ using DotNet.Testcontainers.Containers;
 namespace LocalPost.KafkaConsumer.Tests;
 
 // See also https://github.com/testcontainers/testcontainers-dotnet/blob/develop/src/Testcontainers.Kafka/KafkaBuilder.cs
-public sealed class RpBuilder : ContainerBuilder<RpBuilder, RpContainer, ContainerConfiguration>
+public sealed class RedpandaBuilder : ContainerBuilder<RedpandaBuilder, RedpandaContainer, ContainerConfiguration>
 {
-    public const string RedpandaImage = "docker.redpanda.com/redpandadata/redpanda:v24.1.5";
+    public const string RedpandaImage = "docker.redpanda.com/redpandadata/redpanda:v24.1.7";
 
     public const ushort KafkaPort = 9092;
     public const ushort KafkaAdminPort = 9644;
@@ -18,34 +18,34 @@ public sealed class RpBuilder : ContainerBuilder<RpBuilder, RpContainer, Contain
 
     public const string StartupScriptFilePath = "/testcontainers.sh";
 
-    public RpBuilder() : this(new ContainerConfiguration())
+    public RedpandaBuilder() : this(new ContainerConfiguration())
     {
         DockerResourceConfiguration = Init().DockerResourceConfiguration;
     }
 
-    private RpBuilder(ContainerConfiguration resourceConfiguration) : base(resourceConfiguration)
+    private RedpandaBuilder(ContainerConfiguration resourceConfiguration) : base(resourceConfiguration)
     {
         DockerResourceConfiguration = resourceConfiguration;
     }
 
-    protected override RpBuilder Clone(IResourceConfiguration<CreateContainerParameters> resourceConfiguration) =>
+    protected override RedpandaBuilder Clone(IResourceConfiguration<CreateContainerParameters> resourceConfiguration) =>
         Merge(DockerResourceConfiguration, new ContainerConfiguration(resourceConfiguration));
 
-    protected override RpBuilder Clone(IContainerConfiguration resourceConfiguration) =>
+    protected override RedpandaBuilder Clone(IContainerConfiguration resourceConfiguration) =>
         Merge(DockerResourceConfiguration, new ContainerConfiguration(resourceConfiguration));
 
-    protected override RpBuilder Merge(ContainerConfiguration oldValue, ContainerConfiguration newValue) =>
+    protected override RedpandaBuilder Merge(ContainerConfiguration oldValue, ContainerConfiguration newValue) =>
         new(new ContainerConfiguration(oldValue, newValue));
 
     protected override ContainerConfiguration DockerResourceConfiguration { get; }
 
-    public override RpContainer Build()
+    public override RedpandaContainer Build()
     {
         Validate();
-        return new RpContainer(DockerResourceConfiguration);
+        return new RedpandaContainer(DockerResourceConfiguration);
     }
 
-    protected override RpBuilder Init()
+    protected override RedpandaBuilder Init()
     {
         return base.Init()
             .WithImage(RedpandaImage)
@@ -78,12 +78,20 @@ public sealed class RpBuilder : ContainerBuilder<RpBuilder, RpContainer, Contain
 
 
 
-public sealed class RpContainer(IContainerConfiguration configuration) : DockerContainer(configuration)
+public sealed class RedpandaContainer(IContainerConfiguration configuration) : DockerContainer(configuration)
 {
+    public override async Task StartAsync(CancellationToken ct = default)
+    {
+        await base.StartAsync(ct);
+
+        // Dirty fix, but otherwise the client just fails with strange errors
+        await Task.Delay(3_000, ct);
+    }
+
     public string GetSchemaRegistryAddress() =>
-        new UriBuilder(Uri.UriSchemeHttp, Hostname, GetMappedPublicPort(RpBuilder.SchemaRegistryPort)).ToString();
+        new UriBuilder(Uri.UriSchemeHttp, Hostname, GetMappedPublicPort(RedpandaBuilder.SchemaRegistryPort)).ToString();
 
     public string GetBootstrapAddress() =>
         // new UriBuilder("PLAINTEXT", Hostname, GetMappedPublicPort(RpBuilder.KafkaPort)).ToString();
-        $"{Hostname}:{GetMappedPublicPort(RpBuilder.KafkaPort)}";
+        $"{Hostname}:{GetMappedPublicPort(RedpandaBuilder.KafkaPort)}";
 }

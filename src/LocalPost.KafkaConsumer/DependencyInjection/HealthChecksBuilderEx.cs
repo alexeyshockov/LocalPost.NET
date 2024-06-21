@@ -14,11 +14,11 @@ public static class HealthChecksBuilderEx
 
     public static IHealthChecksBuilder AddKafkaConsumerLivenessCheck(this IHealthChecksBuilder builder,
         string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default) => builder
-        .Add(HealthChecks.LivenessCheckForNamed<MessageSource>(name, failureStatus, tags))
-        .AddNamedConsumerLivenessCheck<MessageSource, ConsumeContext<byte[]>>(name);
+        .Add(HealthChecks.LivenessCheck<MessageSource>(name, failureStatus, tags))
+        .AddPipelineLivenessCheck<MessageSource>(name);
 
-    public static IHealthChecksBuilder AddKafkaBatchConsumerLivenessCheck(this IHealthChecksBuilder builder,
-        string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default) => builder
-        .Add(HealthChecks.LivenessCheckForNamed<BatchMessageSource>(name, failureStatus, tags))
-        .AddNamedConsumerLivenessCheck<BatchMessageSource, BatchConsumeContext<byte[]>>(name);
+    // public static IHealthChecksBuilder AddKafkaBatchConsumerLivenessCheck(this IHealthChecksBuilder builder,
+    //     string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default) => builder
+    //     .Add(HealthChecks.LivenessCheckForNamed<BatchMessageSource>(name, failureStatus, tags))
+    //     .AddNamedConsumerLivenessCheck<BatchMessageSource, BatchConsumeContext<byte[]>>(name);
 }

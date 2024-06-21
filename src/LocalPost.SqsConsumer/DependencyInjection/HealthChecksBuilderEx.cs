@@ -12,11 +12,11 @@ public static class HealthChecksBuilderEx
 
     public static IHealthChecksBuilder AddSqsConsumerLivenessCheck(this IHealthChecksBuilder builder,
         string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default) => builder
-        .Add(HealthChecks.LivenessCheckForNamed<MessageSource>(name, failureStatus, tags))
-        .AddNamedConsumerLivenessCheck<MessageSource, ConsumeContext<string>>(name);
+        .Add(HealthChecks.LivenessCheck<MessageSource>(name, failureStatus, tags))
+        .AddPipelineLivenessCheck<MessageSource>(name);
 
-    public static IHealthChecksBuilder AddSqsBatchConsumerLivenessCheck(this IHealthChecksBuilder builder,
-        string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default) => builder
-        .Add(HealthChecks.LivenessCheckForNamed<BatchMessageSource>(name, failureStatus, tags))
-        .AddNamedConsumerLivenessCheck<BatchMessageSource, BatchConsumeContext<string>>(name);
+    // public static IHealthChecksBuilder AddSqsBatchConsumerLivenessCheck(this IHealthChecksBuilder builder,
+    //     string name, HealthStatus? failureStatus = default, IEnumerable<string>? tags = default) => builder
+    //     .Add(HealthChecks.LivenessCheckForNamed<BatchMessageSource>(name, failureStatus, tags))
+    //     .AddNamedConsumerLivenessCheck<BatchMessageSource, BatchConsumeContext<string>>(name);
 }

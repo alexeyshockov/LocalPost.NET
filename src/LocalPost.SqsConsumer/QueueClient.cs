@@ -6,10 +6,10 @@ using Microsoft.Extensions.Options;
 
 namespace LocalPost.SqsConsumer;
 
-internal sealed class QueueClient(ILogger<QueueClient> logger, IAmazonSQS sqs, Options options, string name)
+internal sealed class QueueClient(ILogger<QueueClient> logger, IAmazonSQS sqs, ConsumerOptions options, string name)
     : INamedService
 {
-    public QueueClient(ILogger<QueueClient> logger, IAmazonSQS sqs, IOptionsMonitor<Options> options, string name) :
+    public QueueClient(ILogger<QueueClient> logger, IAmazonSQS sqs, IOptionsMonitor<ConsumerOptions> options, string name) :
         this(logger, sqs, options.Get(name), name)
     {
     }
@@ -44,7 +44,7 @@ internal sealed class QueueClient(ILogger<QueueClient> logger, IAmazonSQS sqs, O
         try
         {
             // Checking for a possible error in the response would be also good...
-            _queueAttributes = await sqs.GetQueueAttributesAsync(QueueUrl, EndpointOptions.AllAttributes, ct);
+            _queueAttributes = await sqs.GetQueueAttributesAsync(QueueUrl, ["All"], ct);
         }
         catch (OperationCanceledException e) when (e.CancellationToken == ct)
         {
@@ -60,8 +60,8 @@ internal sealed class QueueClient(ILogger<QueueClient> logger, IAmazonSQS sqs, O
     {
         using var activity = Tracing.StartReceiving(this);
 
-        var attributeNames = EndpointOptions.AllAttributes; // Make configurable, later
-        var messageAttributeNames = EndpointOptions.AllMessageAttributes; // Make configurable, later
+        // var attributeNames = EndpointOptions.AllAttributes; // Make configurable, later
+        // var messageAttributeNames = EndpointOptions.AllMessageAttributes; // Make configurable, later
 
         // AWS SDK handles network failures, see
         // https://docs.aws.amazon.com/sdkref/latest/guide/feature-retry-behavior.html
@@ -70,8 +70,8 @@ internal sealed class QueueClient(ILogger<QueueClient> logger, IAmazonSQS sqs, O
             QueueUrl = QueueUrl,
             WaitTimeSeconds = options.WaitTimeSeconds,
             MaxNumberOfMessages = options.MaxNumberOfMessages,
-            AttributeNames = attributeNames,
-            MessageAttributeNames = messageAttributeNames,
+            AttributeNames = options.AttributeNames,
+            MessageAttributeNames = options.MessageAttributeNames,
         }, ct);
 
         activity?.SetTagsFor(response);
@@ -94,11 +94,11 @@ internal sealed class QueueClient(ILogger<QueueClient> logger, IAmazonSQS sqs, O
         // TODO Log failures?..
     }
 
-    public async Task DeleteMessagesAsync<T>(BatchConsumeContext<T> context)
+    public async Task DeleteMessagesAsync<T>(IReadOnlyCollection<ConsumeContext<T>> messages)
     {
-        using var activity = Tracing.StartSettling(context);
+        using var activity = Tracing.StartSettling(messages);
 
-        var requests = context.Messages
+        var requests = messages
             .Select((message, i) => new DeleteMessageBatchRequestEntry(i.ToString(), message.ReceiptHandle))
             .Chunk(10)
             .Select(entries => entries.ToList());

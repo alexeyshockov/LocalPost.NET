@@ -1,65 +1,94 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace LocalPost.DependencyInjection;
 
 internal static class ServiceCollectionTools
 {
-    public static void AddConcurrentHostedServices(this IServiceCollection services) => services
-        .AddHostedService<ConcurrentHostedServices>();
+//     public static void AddBackgroundServiceFor<T>(this IServiceCollection services, string name)
+//         where T : class, IBackgroundService, IServiceFor
+//     {
+//         services.AddConcurrentHostedServices();
+//
+//         var added = services.TryAddNamedSingleton<BackgroundServiceRunner<T>>(name, provider =>
+//             new BackgroundServiceRunner<T>(provider.GetRequiredService<T>(name),
+//                 provider.GetRequiredService<IHostApplicationLifetime>()));
+//         if (!added)
+//             return;
+//
+//         services.AddSingletonAlias<IConcurrentHostedService, NamedBackgroundServiceRunner<T>>(name);
+//     }
+//
+//     public static void AddBackgroundService<T>(this IServiceCollection services, string name)
+//         where T : class, IBackgroundService, INamedService
+//     {
+//         services.AddConcurrentHostedServices();
+//
+//         var added = services.TryAddNamedSingleton<BackgroundServiceRunner<T>>(name, provider =>
+//             new BackgroundServiceRunner<T>(provider.GetRequiredService<T>(name),
+//                 provider.GetRequiredService<IHostApplicationLifetime>()));
+//         if (!added)
+//             return;
+//
+//         services.AddSingletonAlias<IConcurrentHostedService, NamedBackgroundServiceRunner<T>>(name);
+//     }
+//
+//     public static void AddBackgroundService<T>(this IServiceCollection services)
+//         where T : class, IBackgroundService
+//     {
+//         services.AddConcurrentHostedServices();
+//
+//         // We DO expect that this service is registered by the user...
+// //        services.AddSingleton<T>();
+// //        services.AddSingleton<IBackgroundService, T>();
+//
+//         var added = services.TryAddSingleton<BackgroundServiceRunner<T>>(provider =>
+//             new BackgroundServiceRunner<T>(provider.GetRequiredService<T>(),
+//                 provider.GetRequiredService<IHostApplicationLifetime>()));
+//         if (!added)
+//             return;
+//
+//         services.AddSingletonAlias<IConcurrentHostedService, BackgroundServiceRunner<T>>();
+//
+//
+//         // FIXME Remove and check
+//         // services.AddSingleton<IBackgroundServiceMonitor>(provider =>
+//         //     provider.GetRequiredService<BackgroundServiceRunner<T>>());
+//     }
 
-    public static void AddBackgroundServiceForNamed<T>(this IServiceCollection services, string name)
-        where T : class, IBackgroundService, INamedService
+    public static void AddBackgroundService(this IServiceCollection services,
+        Func<IServiceProvider, IBackgroundService> factory) =>
+        services.AddConcurrentHostedServices().AddSingleton(factory);
+
+    public static void AddBackgroundService<T>(this IServiceCollection services)
+        where T : class, IBackgroundService =>
+        services.AddConcurrentHostedServices().AddSingletonAlias<IBackgroundService, T>();
+
+    public static void AddBackgroundService<T>(this IServiceCollection services, string name)
+        where T : class, IBackgroundService, INamedService =>
+        services.AddConcurrentHostedServices().AddSingletonAlias<IBackgroundService, T>(name);
+
+    public static IServiceCollection AddConcurrentHostedServices(this IServiceCollection services)
     {
-        services.AddConcurrentHostedServices();
+        if (!services.TryAddSingleton<BackgroundServices>())
+            return services;
 
-        // We DO expect that this service is registered by the user already...
-//        services.AddSingleton<T>();
-//        services.AddSingleton<IBackgroundService, T>();
-
-        var added = services.TryAddNamedSingleton<NamedBackgroundServiceRunner<T>>(name, provider =>
-            new NamedBackgroundServiceRunner<T>(provider.GetRequiredService<T>(name),
-                provider.GetRequiredService<IHostApplicationLifetime>()));
-        if (!added)
-            return;
-
-        services.AddSingleton<IConcurrentHostedService>(provider =>
-            provider.GetRequiredService<NamedBackgroundServiceRunner<T>>(name));
-        services.AddSingleton<IBackgroundServiceMonitor>(provider =>
-            provider.GetRequiredService<NamedBackgroundServiceRunner<T>>(name));
-    }
-
-    public static void AddBackgroundServiceFor<T>(this IServiceCollection services)
-        where T : class, IBackgroundService
-    {
-        services.AddConcurrentHostedServices();
-
-        // We DO expect that this service is registered by the user already...
-//        services.AddSingleton<T>();
-//        services.AddSingleton<IBackgroundService, T>();
-
-        var added = services.TryAddSingleton<BackgroundServiceRunner<T>>(provider =>
-            new BackgroundServiceRunner<T>(provider.GetRequiredService<T>(),
-                provider.GetRequiredService<IHostApplicationLifetime>()));
-        if (!added)
-            return;
-
-        services.AddSingleton<IConcurrentHostedService>(provider =>
-            provider.GetRequiredService<BackgroundServiceRunner<T>>());
-        services.AddSingleton<IBackgroundServiceMonitor>(provider =>
-            provider.GetRequiredService<BackgroundServiceRunner<T>>());
+        return services
+            .AddHostedService<ConcurrentHostedServices>()
+            .AddSingletonAlias<IConcurrentHostedService, BackgroundServices>();
     }
 
     public static bool TryAddNamedSingleton<TService>(this IServiceCollection services, string name,
-        Func<IServiceProvider, TService> implementationFactory) where TService : class, INamedService =>
-        services.TryAdd(NamedServiceDescriptor.Singleton(name, implementationFactory));
+        Func<IServiceProvider, TService> factory)
+        where TService : class, INamedService =>
+        services.TryAdd(NamedServiceDescriptor.Singleton(name, factory));
 
     public static bool TryAddSingleton<TService>(this IServiceCollection services) where TService : class =>
         services.TryAdd(ServiceDescriptor.Singleton<TService, TService>());
 
     public static bool TryAddSingleton<TService>(this IServiceCollection services,
-        Func<IServiceProvider, TService> implementationFactory) where TService : class =>
-        services.TryAdd(ServiceDescriptor.Singleton(implementationFactory));
+        Func<IServiceProvider, TService> factory)
+        where TService : class =>
+        services.TryAdd(ServiceDescriptor.Singleton(factory));
 
     // "If binary compatibility were not a problem, then the TryAdd methods could return bool"
     // from https://github.com/dotnet/runtime/issues/45114#issuecomment-733807639

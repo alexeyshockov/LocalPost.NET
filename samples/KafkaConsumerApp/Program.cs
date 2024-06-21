@@ -12,7 +12,7 @@ builder.Services
         kafka.Defaults
             .Bind(builder.Configuration.GetSection("Kafka"))
             .ValidateDataAnnotations();
-        kafka.AddConsumer("one-and-the-only", HandlerStack.From<MessageHandler, WeatherForecast>()
+        kafka.AddConsumer("example-consumer-group", HandlerStack.From<MessageHandler, WeatherForecast>()
                 .UseKafkaPayload()
                 .DeserializeJson()
                 .Acknowledge()
@@ -20,7 +20,7 @@ builder.Services
                 .Trace()
             )
             .Bind(builder.Configuration.GetSection("Kafka:Consumer"))
-            .Configure(options =>
+            .ConfigureConsumer(options =>
             {
                 options.AutoOffsetReset = AutoOffsetReset.Earliest;
                 // options.EnableAutoCommit = false; // TODO DryRun

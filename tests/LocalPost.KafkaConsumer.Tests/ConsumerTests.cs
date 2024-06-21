@@ -10,7 +10,7 @@ namespace LocalPost.KafkaConsumer.Tests;
 public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
 {
     // Called for each test, since each test instantiates a new class instance
-    private readonly RpContainer _container = new RpBuilder()
+    private readonly RedpandaContainer _container = new RedpandaBuilder()
         .Build();
 
     private const string Topic = "weather-forecasts";
@@ -18,9 +18,6 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
-
-        // Dirty fix, but otherwise the client fails
-        await Task.Delay(3_000);
 
         using var producer = new ProducerBuilder<string, string>(new ProducerConfig
         {
@@ -52,9 +49,10 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
 
         var hostBuilder = Host.CreateApplicationBuilder();
         hostBuilder.Services.AddKafkaConsumers(kafka => kafka
-            .AddConsumer("test-one", HandlerStack.For<string>(async (payload, _) =>
+            .AddConsumer("test-consumer", HandlerStack.For<string>((payload, _) =>
                 {
                     received.Add(payload);
+                    return default;
                 })
                 .Map<byte[], string>(next => async (payload, ct) =>
                 {
@@ -66,13 +64,18 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
                 .Scoped()
                 .Trace()
             )
-            .Configure(options =>
+            .ConfigureConsumer(consumer =>
             {
-                options.BootstrapServers = _container.GetBootstrapAddress();
-                options.Topic = Topic;
-                options.GroupId = "test-app";
+                consumer.BootstrapServers = _container.GetBootstrapAddress();
+                // This is the default value, from the name parameter above
+                // consumer.GroupId = "test-consumer";
+                consumer.Topic = Topic;
                 // Otherwise the client attaches to the end of the topic, skipping all the published messages
-                options.AutoOffsetReset = AutoOffsetReset.Earliest;
+                consumer.AutoOffsetReset = AutoOffsetReset.Earliest;
+            })
+            .Configure(pipeline =>
+            {
+                pipeline.MaxConcurrency = 2;
             })
             .ValidateDataAnnotations());
 

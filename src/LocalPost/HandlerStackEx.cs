@@ -1,8 +1,10 @@
+using JetBrains.Annotations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace LocalPost;
 
+[PublicAPI]
 public static partial class HandlerStackEx
 {
     // Better use a lambda in place, see Scoped() middleware
@@ -31,8 +33,6 @@ public static partial class HandlerStackEx
     //     return middlewareFactory(provider).Invoke(handler);
     // };
 
-    // public static HandlerFactory<TIn> Map<TIn, TOut>(this HandlerFactory<TOut> hf,
-    //     HandlerMiddleware<TIn, TOut> middleware) => hf.Map(_ => middleware);
     public static HandlerFactory<TIn> Map<TIn, TOut>(this HandlerFactory<TOut> hf,
         HandlerMiddleware<TIn, TOut> middleware) => provider =>
     {
@@ -51,7 +51,7 @@ public static partial class HandlerStackEx
     // public static HandlerFactory<T> Scoped<T>(this HandlerFactory<T> hf) => hf.Map(ScopedHandler.Wrap);
 
     public static HandlerFactory<T> Dispose<T>(this HandlerFactory<T> hf) where T : IDisposable =>
-        hf.Map<T, T>(next => async (context, ct) =>
+        hf.Touch(next => async (context, ct) =>
         {
             try
             {
@@ -64,7 +64,7 @@ public static partial class HandlerStackEx
         });
 
     public static HandlerFactory<T> DisposeAsync<T>(this HandlerFactory<T> hf) where T : IAsyncDisposable =>
-        hf.Map<T, T>(next => async (context, ct) =>
+        hf.Touch(next => async (context, ct) =>
         {
             try
             {
@@ -77,7 +77,7 @@ public static partial class HandlerStackEx
         });
 
     public static HandlerFactory<T> SkipWhen<T>(this HandlerFactory<T> hf, Func<T, bool> pred) =>
-        hf.Map<T, T>(next => async (context, ct) =>
+        hf.Touch(next => async (context, ct) =>
         {
             if (pred(context))
                 return;
@@ -85,27 +85,6 @@ public static partial class HandlerStackEx
             await next(context, ct);
         });
 
-    // public static HandlerFactory<T> ShutdownOnError<T>(this HandlerFactory<T> hf, int exitCode = 1) =>
-    //     hf.Map<T, T>(provider =>
-    //     {
-    //         var appLifetime = provider.GetRequiredService<IHostApplicationLifetime>();
-    //         return next => async (context, ct) =>
-    //         {
-    //             try
-    //             {
-    //                 await next(context, ct);
-    //             }
-    //             catch (OperationCanceledException e) when (e.CancellationToken == ct)
-    //             {
-    //                 throw;
-    //             }
-    //             catch
-    //             {
-    //                 appLifetime.StopApplication();
-    //                 Environment.ExitCode = exitCode;
-    //             }
-    //         };
-    //     });
     public static HandlerFactory<T> ShutdownOnError<T>(this HandlerFactory<T> hf, int exitCode = 1) => provider =>
     {
         var appLifetime = provider.GetRequiredService<IHostApplicationLifetime>();

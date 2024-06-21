@@ -14,8 +14,7 @@ public static class ServiceCollectionEx
         return services;
     }
 
-    internal static bool TryAddQueueClient<TOptions>(this IServiceCollection services, string name)
-        where TOptions : Options =>
+    internal static bool TryAddQueueClient(this IServiceCollection services, string name) =>
         services.TryAddNamedSingleton(name, provider =>
             ActivatorUtilities.CreateInstance<QueueClient>(provider, name));
 }

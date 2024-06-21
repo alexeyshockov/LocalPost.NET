@@ -1,8 +1,35 @@
+using LocalPost.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
+
 namespace LocalPost;
+
+// Because C# does not support sum types...
+// public interface IServiceCollectionFor : IServiceCollection
+// {
+//     string Target { get; }
+// }
+
+public readonly record struct RegistrationContext(IServiceCollection Services, AssistedService Target);
+
+// TODO Make internal
+public delegate Task StreamProcessor<in T>(IAsyncEnumerable<T> stream, CancellationToken ct);
+
+public delegate IAsyncEnumerable<T> PipelineFactory<out T>(IServiceProvider provider);
+
+public delegate void PipelineRegistration<in T>(RegistrationContext services, PipelineFactory<T> source);
+
+
+
+public delegate IAsyncEnumerable<TOut> PipelineMiddleware<in TIn, out TOut>(IAsyncEnumerable<TIn> source,
+    CancellationToken ct = default);
+
+
 
 public delegate ValueTask Handler<in T>(T context, CancellationToken ct);
 
 public delegate Handler<T> HandlerFactory<in T>(IServiceProvider provider);
+
+
 
 public delegate Handler<TIn> HandlerMiddleware<in TIn, out TOut>(Handler<TOut> next);
 

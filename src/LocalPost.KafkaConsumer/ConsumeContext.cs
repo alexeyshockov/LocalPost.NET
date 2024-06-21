@@ -4,12 +4,12 @@ using LocalPost.AsyncEnumerable;
 
 namespace LocalPost.KafkaConsumer;
 
-internal static class ConsumeContext
-{
-    public static BatchBuilderFactory<ConsumeContext<byte[]>, BatchConsumeContext<byte[]>> BatchBuilder(
-        MaxSize batchMaxSize, TimeSpan timeWindow) => ct =>
-        new BatchConsumeContext<byte[]>.Builder(batchMaxSize, timeWindow, ct);
-}
+// internal static class ConsumeContext
+// {
+//     public static BatchBuilderFactory<ConsumeContext<byte[]>, BatchConsumeContext<byte[]>> BatchBuilder(
+//         MaxSize batchMaxSize, TimeSpan timeWindow) => ct =>
+//         new BatchConsumeContext<byte[]>.Builder(batchMaxSize, timeWindow, ct);
+// }
 
 [PublicAPI]
 public readonly record struct ConsumeContext<T>
@@ -52,56 +52,56 @@ public readonly record struct ConsumeContext<T>
     public static implicit operator T(ConsumeContext<T> context) => context.Payload;
 }
 
-[PublicAPI]
-public readonly record struct BatchConsumeContext<T>
-{
-    internal sealed class Builder(MaxSize batchMaxSize, TimeSpan timeWindowDuration, CancellationToken ct = default)
-        : BoundedBatchBuilderBase<ConsumeContext<T>, BatchConsumeContext<T>>(batchMaxSize, timeWindowDuration, ct)
-    {
-        public override BatchConsumeContext<T> Build()
-        {
-// #if NET6_0_OR_GREATER
-//             ReadOnlySpan<T> s = CollectionsMarshal.AsSpan(Batch)
-//             var ia = s.ToImmutableArray();
-//             return new BatchConsumeContext<T>(Batch);
-// #else
-//             return new BatchConsumeContext<T>(Batch.ToImmutableArray());
-// #endif
-             return new BatchConsumeContext<T>(Batch);
-        }
-    }
-
-    // TODO ImmutableArray
-    public readonly IReadOnlyList<ConsumeContext<T>> Messages;
-
-    internal BatchConsumeContext(IReadOnlyList<ConsumeContext<T>> messages)
-    {
-        if (messages.Count == 0)
-            throw new ArgumentException("Batch must contain at least one message", nameof(messages));
-
-        Messages = messages;
-    }
-
-    public BatchConsumeContext<TOut> Transform<TOut>(ConsumeContext<TOut>[] payload) => new(payload);
-
-    public BatchConsumeContext<TOut> Transform<TOut>(IEnumerable<ConsumeContext<TOut>> payload) =>
-        Transform(payload.ToArray());
-
-    public BatchConsumeContext<TOut> Transform<TOut>(IEnumerable<TOut> batchPayload) =>
-        Transform(Messages.Zip(batchPayload, (message, payload) => message.Transform(payload)));
-
-    public BatchConsumeContext<TOut> Transform<TOut>(Func<ConsumeContext<T>, TOut> transform)
-    {
-        // TODO Parallel LINQ
-        var messages = Messages.Select(transform);
-        return Transform(messages);
-    }
-
-    public async Task<BatchConsumeContext<TOut>> Transform<TOut>(Func<ConsumeContext<T>, Task<TOut>> transform)
-    {
-        var messages = await Task.WhenAll(Messages.Select(transform));
-        return Transform(messages);
-    }
-
-    internal KafkaTopicClient Client => Messages[^1].Client;
-}
+// [PublicAPI]
+// public readonly record struct BatchConsumeContext<T>
+// {
+//     internal sealed class Builder(MaxSize batchMaxSize, TimeSpan timeWindowDuration, CancellationToken ct = default)
+//         : BoundedBatchBuilderBase<ConsumeContext<T>, BatchConsumeContext<T>>(batchMaxSize, timeWindowDuration, ct)
+//     {
+//         public override BatchConsumeContext<T> Build()
+//         {
+// // #if NET6_0_OR_GREATER
+// //             ReadOnlySpan<T> s = CollectionsMarshal.AsSpan(Batch)
+// //             var ia = s.ToImmutableArray();
+// //             return new BatchConsumeContext<T>(Batch);
+// // #else
+// //             return new BatchConsumeContext<T>(Batch.ToImmutableArray());
+// // #endif
+//              return new BatchConsumeContext<T>(Batch);
+//         }
+//     }
+//
+//     // TODO ImmutableArray
+//     public readonly IReadOnlyList<ConsumeContext<T>> Messages;
+//
+//     internal BatchConsumeContext(IReadOnlyList<ConsumeContext<T>> messages)
+//     {
+//         if (messages.Count == 0)
+//             throw new ArgumentException("Batch must contain at least one message", nameof(messages));
+//
+//         Messages = messages;
+//     }
+//
+//     public BatchConsumeContext<TOut> Transform<TOut>(ConsumeContext<TOut>[] payload) => new(payload);
+//
+//     public BatchConsumeContext<TOut> Transform<TOut>(IEnumerable<ConsumeContext<TOut>> payload) =>
+//         Transform(payload.ToArray());
+//
+//     public BatchConsumeContext<TOut> Transform<TOut>(IEnumerable<TOut> batchPayload) =>
+//         Transform(Messages.Zip(batchPayload, (message, payload) => message.Transform(payload)));
+//
+//     public BatchConsumeContext<TOut> Transform<TOut>(Func<ConsumeContext<T>, TOut> transform)
+//     {
+//         // TODO Parallel LINQ
+//         var messages = Messages.Select(transform);
+//         return Transform(messages);
+//     }
+//
+//     public async Task<BatchConsumeContext<TOut>> Transform<TOut>(Func<ConsumeContext<T>, Task<TOut>> transform)
+//     {
+//         var messages = await Task.WhenAll(Messages.Select(transform));
+//         return Transform(messages);
+//     }
+//
+//     internal KafkaTopicClient Client => Messages[^1].Client;
+// }

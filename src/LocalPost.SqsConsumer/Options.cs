@@ -7,28 +7,8 @@ namespace LocalPost.SqsConsumer;
 ///     General SQS settings.
 /// </summary>
 [PublicAPI]
-public record EndpointOptions
+public sealed class EndpointOptions
 {
-    // AWS SDK requires List<string>... No way to make it readonly / immutable :(
-    internal static readonly List<string> AllAttributes = ["All"];
-    internal static readonly List<string> AllMessageAttributes = ["All"];
-
-    /// <summary>
-    ///     How many messages to process concurrently. Default is 10.
-    /// </summary>
-    public ushort MaxConcurrency { get; set; } = 10;
-
-    /// <summary>
-    ///     Stop the consumer in case of an exception in the handler, or just log it and continue the processing loop.
-    ///     Default is true.
-    /// </summary>
-    public bool BreakOnException { get; set; } = true;
-
-    /// <summary>
-    ///     How many messages to prefetch from SQS. Default is 10.
-    /// </summary>
-    public byte Prefetch { get; set; } = 10;
-
     /// <summary>
     ///     Time to wait for available messages in the queue. 0 is short pooling, where 1..20 activates long pooling.
     ///     Default is 20.
@@ -66,25 +46,72 @@ public record EndpointOptions
 //    [Range(1, int.MaxValue)]
 //    public int? TimeoutMilliseconds { get; set; }
 
-    internal void UpdateFrom(EndpointOptions other)
-    {
-        MaxConcurrency = other.MaxConcurrency;
-        Prefetch = other.Prefetch;
-        WaitTimeSeconds = other.WaitTimeSeconds;
-        MaxNumberOfMessages = other.MaxNumberOfMessages;
-    }
+    public List<string> AttributeNames { get; set; } = ["All"];
+
+    public List<string> MessageAttributeNames { get; set; } = ["All"];
 }
 
 /// <summary>
 ///     SQS queue consumer settings.
 /// </summary>
 [PublicAPI]
-public record Options : EndpointOptions
+public sealed class ConsumerOptions
 {
+    /// <summary>
+    ///     Time to wait for available messages in the queue. 0 is short pooling, where 1..20 activates long pooling.
+    ///     Default is 20.
+    /// </summary>
+    /// <see href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html">
+    ///     Amazon SQS short and long polling
+    /// </see>
+    /// <see href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/working-with-messages.html#setting-up-long-polling">
+    ///     Setting up long polling
+    /// </see>
+    [Range(0, 20)]
+    public byte WaitTimeSeconds { get; set; } = 20;
+
+    /// <summary>
+    ///     The maximum number of messages to return. Amazon SQS never returns more messages than this value (however,
+    ///     fewer messages might be returned). Valid values: 1 to 10. Default is 1.
+    /// </summary>
+    /// <see href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html">
+    ///     Amazon SQS short and long polling
+    /// </see>
+    /// <see href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/working-with-messages.html#setting-up-long-polling">
+    ///     Setting up long polling
+    /// </see>
+    [Range(1, 10)]
+    public byte MaxNumberOfMessages { get; set; } = 10;
+
+    public List<string> AttributeNames { get; set; } = ["All"];
+
+    public List<string> MessageAttributeNames { get; set; } = ["All"];
+
+    internal void UpdateFrom(EndpointOptions global)
+    {
+        // MaxConcurrency = other.MaxConcurrency;
+        // Prefetch = other.Prefetch;
+        WaitTimeSeconds = global.WaitTimeSeconds;
+        MaxNumberOfMessages = global.MaxNumberOfMessages;
+        AttributeNames = global.AttributeNames;
+        MessageAttributeNames = global.MessageAttributeNames;
+    }
+
+    internal void UpdateFrom(ConsumerOptions other)
+    {
+        WaitTimeSeconds = other.WaitTimeSeconds;
+        MaxNumberOfMessages = other.MaxNumberOfMessages;
+        AttributeNames = other.AttributeNames;
+        MessageAttributeNames = other.MessageAttributeNames;
+        QueueName = other.QueueName;
+        _queueUrl = other._queueUrl;
+    }
+
     [Required]
     public string QueueName { get; set; } = null!;
 
     private string? _queueUrl;
+
     /// <summary>
     ///     If not set, IAmazonSQS.GetQueueUrlAsync(QueueName) will be used once, to get the actual URL of the queue.
     /// </summary>
@@ -103,15 +130,50 @@ public record Options : EndpointOptions
     }
 }
 
-/// <summary>
-///     SQS queue batch consumer settings.
-/// </summary>
 [PublicAPI]
-public record BatchedOptions : Options
+public sealed class DefaultPipelineOptions
 {
+    public ConsumerOptions Consume { get; } = new();
+
+    [Range(1, ushort.MaxValue)]
+    public ushort MaxConcurrency { get; set; } = 10;
+
+    [Range(1, ushort.MaxValue)]
+    public ushort Prefetch { get; set; } = 10;
+
+    public static implicit operator Pipeline.ConsumerOptions(DefaultPipelineOptions options) => new()
+    {
+        MaxConcurrency = options.MaxConcurrency,
+        BreakOnException = false,
+    };
+}
+
+[PublicAPI]
+public sealed record DefaultBatchPipelineOptions
+{
+    public ConsumerOptions Consume { get; } = new();
+
+    [Range(1, ushort.MaxValue)]
+    public ushort MaxConcurrency { get; set; } = 10;
+
+    [Range(1, ushort.MaxValue)]
+    public ushort Prefetch { get; set; } = 10;
+
     [Range(1, ushort.MaxValue)]
     public ushort BatchMaxSize { get; set; } = 10;
 
     [Range(1, ushort.MaxValue)]
-    public int BatchTimeWindowMilliseconds { get; set; } = 1_000;
+    public int TimeWindowMs { get; set; } = 1_000;
+
+    public static implicit operator Pipeline.ConsumerOptions(DefaultBatchPipelineOptions options) => new()
+    {
+        MaxConcurrency = options.MaxConcurrency,
+        BreakOnException = false,
+    };
+
+    public static implicit operator BatchOptions(DefaultBatchPipelineOptions options) => new()
+    {
+        MaxSize = options.BatchMaxSize,
+        TimeWindowDuration = options.TimeWindowMs,
+    };
 }

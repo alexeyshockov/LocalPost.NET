@@ -6,7 +6,7 @@ internal sealed class BatchingAsyncEnumerable<T, TOut>(
     public async IAsyncEnumerator<TOut> GetAsyncEnumerator(CancellationToken ct = default)
     {
         await using var source = reader.GetAsyncEnumerator(ct);
-        using var batchBuilder = factory(ct);
+        using var batchBuilder = factory();
         while (!ct.IsCancellationRequested)
         {
             TOut completedBatch;
@@ -31,7 +31,7 @@ internal sealed class BatchingAsyncEnumerable<T, TOut>(
             {
                 break;
             }
-            // Batch time window is closed, or the cancellation token is triggered
+            // Batch time window has closed, or enumerator's cancellation has been triggered
             catch (OperationCanceledException)
             {
                 if (batchBuilder.IsEmpty)

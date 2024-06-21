@@ -68,8 +68,8 @@ internal static class KafkaActivityExtensions
         return activity;
     }
 
-    public static Activity? SetTagsFor<T>(this Activity? activity, BatchConsumeContext<T> context) =>
-        activity?.SetTag("messaging.batch.message_count", context.Messages.Count);
+    public static Activity? SetTagsFor<T>(this Activity? activity, IReadOnlyCollection<ConsumeContext<T>> batch) =>
+        activity?.SetTag("messaging.batch.message_count", batch.Count);
 }
 
 // Npgsql as an inspiration:
@@ -105,15 +105,16 @@ internal static class Tracing
         return activity;
     }
 
-
-    public static Activity? StartProcessing<T>(BatchConsumeContext<T> context)
+    public static Activity? StartProcessing<T>(IReadOnlyCollection<ConsumeContext<T>> batch)
     {
-        var activity = Source.StartActivity($"{context.Client.Topic} process", ActivityKind.Consumer);
+        var client = batch.First().Client;
+        // It is actually can be multiple topics, it is possible to subscribe using a pattern...
+        var activity = Source.StartActivity($"{client.Topic} process", ActivityKind.Consumer);
         if (activity is not { IsAllDataRequested: true })
             return activity;
 
-        activity.SetDefaultTags(context.Client);
-        activity.SetTagsFor(context);
+        activity.SetDefaultTags(client);
+        activity.SetTagsFor(batch);
 
         // TODO Accept distributed tracing headers, per each message...
 
