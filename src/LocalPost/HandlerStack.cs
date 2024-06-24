@@ -91,11 +91,11 @@ public static class Pipeline
         }
     }
 
-    public static PipelineRegistration<T> Create<T>(HandlerFactory<T> hf,
+    internal static PipelineRegistration<T> Create<T>(HandlerFactory<T> hf,
         ushort maxConcurrency, bool breakOnException) =>
         Create(hf, _ => new ConsumerOptions(maxConcurrency, breakOnException));
 
-    public static PipelineRegistration<T> Create<T>(HandlerFactory<T> hf,
+    internal static PipelineRegistration<T> Create<T>(HandlerFactory<T> hf,
         Func<IServiceProvider, ConsumerOptions> config) => (context, pf) =>
         context.Services.AddBackgroundService(provider =>
         {
@@ -115,7 +115,7 @@ public static class Pipeline
 }
 
 [PublicAPI]
-public static class PipelineOps
+internal static class PipelineOps
 {
     public static PipelineRegistration<T> Where<T>(this PipelineRegistration<T> next,
         Func<T, bool> pred)

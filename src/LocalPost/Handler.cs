@@ -3,24 +3,18 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace LocalPost;
 
-// Because C# does not support sum types...
-// public interface IServiceCollectionFor : IServiceCollection
-// {
-//     string Target { get; }
-// }
-
-public readonly record struct RegistrationContext(IServiceCollection Services, AssistedService Target);
+internal readonly record struct RegistrationContext(IServiceCollection Services, AssistedService Target);
 
 // TODO Make internal
-public delegate Task StreamProcessor<in T>(IAsyncEnumerable<T> stream, CancellationToken ct);
+internal delegate Task StreamProcessor<in T>(IAsyncEnumerable<T> stream, CancellationToken ct);
 
-public delegate IAsyncEnumerable<T> PipelineFactory<out T>(IServiceProvider provider);
+internal delegate IAsyncEnumerable<T> PipelineFactory<out T>(IServiceProvider provider);
 
-public delegate void PipelineRegistration<in T>(RegistrationContext services, PipelineFactory<T> source);
+internal delegate void PipelineRegistration<in T>(RegistrationContext services, PipelineFactory<T> source);
 
 
 
-public delegate IAsyncEnumerable<TOut> PipelineMiddleware<in TIn, out TOut>(IAsyncEnumerable<TIn> source,
+internal delegate IAsyncEnumerable<TOut> PipelineMiddleware<in TIn, out TOut>(IAsyncEnumerable<TIn> source,
     CancellationToken ct = default);
 
 

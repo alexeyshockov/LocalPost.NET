@@ -58,7 +58,7 @@ public class BackgroundQueuesBuilder(IServiceCollection services)
         return QueueFor<T>();
     }
 
-    public OptionsBuilder<QueueOptions<T>> Add<T>(PipelineRegistration<ConsumeContext<T>> pr)
+    internal OptionsBuilder<QueueOptions<T>> Add<T>(PipelineRegistration<ConsumeContext<T>> pr)
     {
         if (!services.TryAddSingletonAlias<IBackgroundQueue<T>, BackgroundQueue<T>>())
             // return ob; // Already added, don't register twice

@@ -64,7 +64,7 @@ public sealed class SqsBuilder(IServiceCollection services)
     /// <param name="name">Consumer name (also the default queue name). Should be unique in the application.</param>
     /// <param name="pr">Pipeline registration.</param>
     /// <returns>Consumer options builder.</returns>
-    public OptionsBuilder<ConsumerOptions> Add(string name, PipelineRegistration<ConsumeContext<string>> pr)
+    internal OptionsBuilder<ConsumerOptions> Add(string name, PipelineRegistration<ConsumeContext<string>> pr)
     {
         if (string.IsNullOrEmpty(name))
             throw new ArgumentException("A proper (non empty) name is required", nameof(name));

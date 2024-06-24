@@ -57,7 +57,7 @@ public sealed class KafkaBuilder(IServiceCollection services)
         });
     }
 
-    public OptionsBuilder<ConsumerOptions> Add(string name, PipelineRegistration<ConsumeContext<byte[]>> pr)
+    internal OptionsBuilder<ConsumerOptions> Add(string name, PipelineRegistration<ConsumeContext<byte[]>> pr)
     {
         if (string.IsNullOrEmpty(name)) // TODO Just default (empty?) name...
             throw new ArgumentException("A proper (non empty) name is required", nameof(name));
