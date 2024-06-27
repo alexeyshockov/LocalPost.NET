@@ -80,7 +80,7 @@ internal static class ServiceCollectionTools
     public static bool TryAddNamedSingleton<TService>(this IServiceCollection services, string name,
         Func<IServiceProvider, TService> factory)
         where TService : class, INamedService =>
-        services.TryAdd(NamedServiceDescriptor.Singleton(name, factory));
+        services.TryAdd(ServiceDescriptor.KeyedSingleton(name, factory));
 
     public static bool TryAddSingleton<TService>(this IServiceCollection services) where TService : class =>
         services.TryAdd(ServiceDescriptor.Singleton<TService, TService>());
@@ -104,8 +104,8 @@ internal static class ServiceCollectionTools
         static bool IsEqual(ServiceDescriptor a, ServiceDescriptor b)
         {
             var equal = a.ServiceType == b.ServiceType; // && a.Lifetime == b.Lifetime;
-            if (equal && a is NamedServiceDescriptor namedA && b is NamedServiceDescriptor namedB)
-                return namedA.Name == namedB.Name;
+            if (equal && a is { IsKeyedService: true } && b is { IsKeyedService: true })
+                return a.ServiceKey == b.ServiceKey;
 
             return equal;
         }
