@@ -41,7 +41,7 @@ internal sealed class AsyncEnumerableMerger<T> : IAsyncEnumerable<T>, IDisposabl
 
         while (waits.Length > 0)
         {
-            var modificationTrigger = _sources.Modification;
+            var modificationTrigger = Task.Delay(Timeout.Infinite, _sources.ModificationToken);
             var waitTrigger = Task.WhenAny(waits);
 
             await Task.WhenAny(waitTrigger, modificationTrigger);

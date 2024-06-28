@@ -1,6 +1,3 @@
-using System.Collections.Immutable;
-using Nito.AsyncEx;
-
 namespace LocalPost.AsyncEnumerable;
 
 internal delegate IBatchBuilder<T, TBatch> BatchBuilderFactory<in T, out TBatch>();
@@ -8,7 +5,6 @@ internal delegate IBatchBuilder<T, TBatch> BatchBuilderFactory<in T, out TBatch>
 internal interface IBatchBuilder<in T, out TBatch> : IDisposable
 {
     CancellationToken TimeWindow { get; }
-    Task TimeWindowTrigger { get; }
 
     bool IsEmpty { get; }
     bool Full { get; }
@@ -25,7 +21,6 @@ internal abstract class BatchBuilderBase<T, TBatch> : IBatchBuilder<T, TBatch>
     private readonly TimeSpan _timeWindowDuration;
 
     private CancellationTokenSource _timeWindow;
-    private CancellationTokenTaskSource<bool>? _timeWindowTrigger;
 
     protected BatchBuilderBase(TimeSpan timeWindowDuration)
     {
@@ -34,9 +29,6 @@ internal abstract class BatchBuilderBase<T, TBatch> : IBatchBuilder<T, TBatch>
     }
 
     public CancellationToken TimeWindow => _timeWindow.Token;
-    public bool TimeWindowClosed => TimeWindow.IsCancellationRequested;
-    public Task TimeWindowTrigger =>
-        (_timeWindowTrigger ??= new CancellationTokenTaskSource<bool>(_timeWindow.Token)).Task;
 
     public abstract bool IsEmpty { get; }
     public abstract bool Full { get; }
@@ -53,9 +45,6 @@ internal abstract class BatchBuilderBase<T, TBatch> : IBatchBuilder<T, TBatch>
         _timeWindow.Cancel();
         _timeWindow.Dispose();
         _timeWindow = StartTimeWindow();
-
-        _timeWindowTrigger?.Dispose();
-        _timeWindowTrigger = null;
     }
 
     public TBatch Flush()
@@ -68,7 +57,6 @@ internal abstract class BatchBuilderBase<T, TBatch> : IBatchBuilder<T, TBatch>
     public virtual void Dispose()
     {
         _timeWindow.Dispose();
-        _timeWindowTrigger?.Dispose();
     }
 }
 

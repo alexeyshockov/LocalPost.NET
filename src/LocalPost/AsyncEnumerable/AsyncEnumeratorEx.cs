@@ -1,5 +1,3 @@
-using Nito.AsyncEx;
-
 namespace LocalPost.AsyncEnumerable;
 
 internal static class AsyncEnumeratorEx

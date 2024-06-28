@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>netstandard2.0;net6.0;net8.0</TargetFrameworks>
+        <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
         <IsPackable>true</IsPackable>
         <!-- See https://docs.microsoft.com/en-us/nuget/create-packages/creating-a-package-dotnet-cli -->
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>

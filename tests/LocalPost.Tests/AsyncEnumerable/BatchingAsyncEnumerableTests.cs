@@ -1,7 +1,5 @@
 using System.Threading.Channels;
-using FluentAssertions;
 using LocalPost.AsyncEnumerable;
-using Nito.AsyncEx;
 
 namespace LocalPost.Tests.AsyncEnumerable;
 
