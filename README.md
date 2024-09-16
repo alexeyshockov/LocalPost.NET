@@ -10,6 +10,18 @@ There are multiple ways to run background tasks in .NET. The most common are:
 
 ### Installation
 
+For the core library:
+
+```shell
+dotnet add package LocalPost
+```
+
+AWS SQS, Kafka and other integrations are provided as separate packages:
+
+```shell
+dotnet add package LocalPost.KafkaConsumer
+```
+
 ### .NET 8 asynchronous background services handling
 
 Before version 8 .NET runtime handled start/stop of the services only synchronously, but now it is possible to enable
@@ -20,8 +32,18 @@ See for details:
 - https://github.com/dotnet/runtime/blob/v8.0.0/src/libraries/Microsoft.Extensions.Hosting/src/Internal/Host.cs
 - https://github.com/dotnet/runtime/blob/main/src/libraries/Microsoft.Extensions.Hosting/src/HostOptions.cs
 
-## Similar projects / Inspiration
+## Similar projects
 
-- [FastStream](https://github.com/airtai/faststream) — Python framework with almost the same concept
-- [Coravel queue](https://docs.coravel.net/Queuing/)/event broadcasting — only invocable queueing, event broadcasting is different from consuming a queue
-- [Hangfire](https://www.hangfire.io/) — for persistent queues (means payload serialisation), LocalPost is completely about in-memory ones
+- [Coravel queue](https://docs.coravel.net/Queuing/) — a simple job queue
+
+More complex jobs management / scheduling:
+- [Hangfire](https://www.hangfire.io/) — background job scheduler. Supports advanced scheduling, persistence and jobs distribution across multiple workers.
+
+Service bus (for bigger solutions):
+- [JustSaying](https://github.com/justeattakeaway/JustSaying)
+- [NServiceBus](https://docs.particular.net/nservicebus/)
+- [MassTransit](https://masstransit.io/)
+
+## Inspiration
+
+- [FastStream](https://github.com/airtai/faststream) — Python framework with similar goals

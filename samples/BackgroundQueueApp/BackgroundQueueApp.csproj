@@ -14,7 +14,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\LocalPost\LocalPost.csproj" />
-        <ProjectReference Include="..\..\src\LocalPost.Polly\LocalPost.Polly.csproj" />
+        <ProjectReference Include="..\..\src\LocalPost.Resilience\LocalPost.Resilience.csproj" />
     </ItemGroup>
 
     <ItemGroup>

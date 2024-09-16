@@ -28,7 +28,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KafkaConsumerApp", "samples
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SqsConsumerApp", "samples\SqsConsumerApp\SqsConsumerApp.csproj", "{2778AEBD-0345-4F79-9E93-73AFAB6C7BCD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost.Polly", "src\LocalPost.Polly\LocalPost.Polly.csproj", "{EA69FF51-BEF7-415C-836A-BB5432206F7E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost.Resilience", "src\LocalPost.Resilience\LocalPost.Resilience.csproj", "{EA69FF51-BEF7-415C-836A-BB5432206F7E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RabbitMqConsumerApp", "samples\RabbitMqConsumerApp\RabbitMqConsumerApp.csproj", "{F9BD092A-DC16-43A8-B605-46FDFAEFBEDA}"
 EndProject
@@ -37,6 +37,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost.RabbitMqConsumer.Tests", "tests\LocalPost.RabbitMqConsumer.Tests\LocalPost.RabbitMqConsumer.Tests.csproj", "{92461B19-6794-4EB2-BFFE-DCD9CDFFD6D8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost.NatsConsumer", "src\LocalPost.NatsConsumer\LocalPost.NatsConsumer.csproj", "{05A771C9-0987-484A-8A7F-B6B1180F55F9}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "BackgroundQueueApp.FSharp", "samples\BackgroundQueueApp.FSharp\BackgroundQueueApp.FSharp.fsproj", "{79CF7EFF-860D-464F-B59A-55E48D25D70C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -116,6 +118,10 @@ Global
 		{05A771C9-0987-484A-8A7F-B6B1180F55F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{05A771C9-0987-484A-8A7F-B6B1180F55F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{05A771C9-0987-484A-8A7F-B6B1180F55F9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{79CF7EFF-860D-464F-B59A-55E48D25D70C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{79CF7EFF-860D-464F-B59A-55E48D25D70C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{79CF7EFF-860D-464F-B59A-55E48D25D70C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{79CF7EFF-860D-464F-B59A-55E48D25D70C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{46FC61E6-D0FB-4D7D-A81B-20EF8D8D1F4E} = {405721DC-F290-4191-B638-9907D5EB042B}
@@ -123,5 +129,6 @@ Global
 		{C310487A-B976-4D3E-80AF-4ADBE1C63139} = {405721DC-F290-4191-B638-9907D5EB042B}
 		{2778AEBD-0345-4F79-9E93-73AFAB6C7BCD} = {405721DC-F290-4191-B638-9907D5EB042B}
 		{F9BD092A-DC16-43A8-B605-46FDFAEFBEDA} = {405721DC-F290-4191-B638-9907D5EB042B}
+		{79CF7EFF-860D-464F-B59A-55E48D25D70C} = {405721DC-F290-4191-B638-9907D5EB042B}
 	EndGlobalSection
 EndGlobal

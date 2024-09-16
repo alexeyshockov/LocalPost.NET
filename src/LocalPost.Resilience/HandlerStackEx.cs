@@ -1,7 +1,7 @@
 using JetBrains.Annotations;
 using Polly;
 
-namespace LocalPost.Polly;
+namespace LocalPost.Resilience;
 
 [PublicAPI]
 public static class HandlerStackEx

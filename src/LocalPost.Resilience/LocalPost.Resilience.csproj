@@ -6,7 +6,7 @@
         <!-- See https://docs.microsoft.com/en-us/nuget/create-packages/creating-a-package-dotnet-cli -->
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 
-        <PackageId>LocalPost.Polly</PackageId>
+        <PackageId>LocalPost.Resilience</PackageId>
         <Authors>Alexey Shokov</Authors>
         <Description>Polly integration for LocalPost</Description>
         <PackageReleaseNotes>https://github.com/alexeyshockov/LocalPost/v$(Version)</PackageReleaseNotes>
