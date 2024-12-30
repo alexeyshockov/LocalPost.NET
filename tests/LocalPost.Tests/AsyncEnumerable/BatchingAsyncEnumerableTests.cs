@@ -6,15 +6,17 @@ namespace LocalPost.Tests.AsyncEnumerable;
 public class BatchingAsyncEnumerableTests
 {
     [Fact]
-    internal async Task batches()
+    internal async Task collects_in_batches()
     {
         var source = Channel.CreateUnbounded<int>(new UnboundedChannelOptions
         {
             SingleReader = true,
             SingleWriter = false
         });
-        var results = source.Reader.ReadAllAsync().Batch(
-            () => new BoundedBatchBuilder<int>(10, TimeSpan.FromSeconds(2)));
+        var results = source.Reader.ReadAllAsync().Batch(10, TimeSpan.FromSeconds(2));
+
+        await Task.WhenAll(Produce(), Consume());
+        return;
 
         async Task Produce()
         {
@@ -42,7 +44,5 @@ public class BatchingAsyncEnumerableTests
 
             expect.Should().BeEmpty();
         }
-
-        await Task.WhenAll(Produce(), Consume());
     }
 }

@@ -19,29 +19,29 @@ builder.Services
     .AddScoped<MessageHandler>()
     .AddSqsConsumers(sqs =>
     {
-        // sqs.Defaults.Configure(options => options.MaxConcurrency = 100);
-        // sqs.AddConsumer("weather-forecasts",
-        //     HandlerStack.From<MessageHandler, WeatherForecast>()
-        //         .UseSqsPayload()
-        //         .DeserializeJson()
-        //         .Acknowledge()
-        //         .Scoped()
-        //         .LogFingersCrossed()
-        //         .Trace());
-        // sqs.Defaults.Configure(options => options.MaxConcurrency = 100);
-        // sqs.AddConsumer("weather-forecasts",
-        //     Pipeline.Create(
-        //         HandlerStack.From<MessageHandler, WeatherForecast>()
-        //             .UseSqsPayload()
-        //             .DeserializeJson()
-        //             .Acknowledge()
-        //             .Scoped()
-        //             .LogFingersCrossed()
-        //             .Trace(),
-        //         maxConcurrency: 100,
-        //         breakOnException: false
-        //     ).Buffer(100)
-        // );
+        sqs.Defaults.Configure(options => options.MaxConcurrency = 100);
+        sqs.AddConsumer("weather-forecasts",
+            HandlerStack.From<MessageHandler, WeatherForecast>()
+                .UseSqsPayload()
+                .DeserializeJson()
+                .Acknowledge()
+                .Scoped()
+                .LogFingersCrossed()
+                .Trace());
+        sqs.Defaults.Configure(options => options.MaxConcurrency = 100);
+        sqs.AddConsumer("weather-forecasts",
+            Pipeline.Create(
+                HandlerStack.From<MessageHandler, WeatherForecast>()
+                    .UseSqsPayload()
+                    .DeserializeJson()
+                    .Acknowledge()
+                    .Scoped()
+                    .LogFingersCrossed()
+                    .Trace(),
+                maxConcurrency: 100,
+                breakOnException: false
+            ).Buffer(100)
+        );
     });
 
 // TODO Health + Supervisor

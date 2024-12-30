@@ -24,6 +24,9 @@ public class AsyncEnumerableMergerTests
             source1.Reader.ReadAllAsync(), source2.Reader.ReadAllAsync()
         });
 
+        await Task.WhenAll(Produce(), Consume());
+        return;
+
         async Task Produce()
         {
             await source1.Writer.WriteAsync(1);
@@ -55,8 +58,6 @@ public class AsyncEnumerableMergerTests
 
             expect.Should().BeEmpty();
         }
-
-        await Task.WhenAll(Produce(), Consume());
     }
 
     [Fact]
@@ -73,6 +74,9 @@ public class AsyncEnumerableMergerTests
             SingleWriter = false
         });
         var results = new AsyncEnumerableMerger<int>(true);
+
+        await Task.WhenAll(Produce(), Consume());
+        return;
 
         async Task Produce()
         {
@@ -121,8 +125,6 @@ public class AsyncEnumerableMergerTests
             cts.IsCancellationRequested.Should().BeTrue();
             expect.Should().BeEmpty();
         }
-
-        await Task.WhenAll(Produce(), Consume());
     }
 
     [Fact]

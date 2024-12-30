@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using JetBrains.Annotations;
 using LocalPost.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,7 +24,7 @@ public class BackgroundQueuesBuilder(IServiceCollection services)
     }
 
     public OptionsBuilder<DefaultBatchPipelineOptions<T>> AddBatchedQueue<T>(
-        HandlerFactory<IEnumerable<ConsumeContext<T>>> hf)
+        HandlerFactory<ImmutableArray<ConsumeContext<T>>> hf)
     {
         var defaultPipeline = Pipeline
             .Create(hf, provider => provider.GetOptions<DefaultBatchPipelineOptions<T>>())

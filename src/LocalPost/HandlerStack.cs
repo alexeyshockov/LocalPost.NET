@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using JetBrains.Annotations;
@@ -260,15 +261,15 @@ internal static class PipelineOps
     //     }
     // }
 
-    public static PipelineRegistration<T> Batch<T>(this PipelineRegistration<IEnumerable<T>> next,
+    public static PipelineRegistration<T> Batch<T>(this PipelineRegistration<ImmutableArray<T>> next,
         ushort batchMaxSize = 10, int timeWindowDuration = 1_000) =>
         next.Batch(_ => new BatchOptions(batchMaxSize, timeWindowDuration));
 
-    public static PipelineRegistration<T> Batch<T>(this PipelineRegistration<IEnumerable<T>> next,
+    public static PipelineRegistration<T> Batch<T>(this PipelineRegistration<ImmutableArray<T>> next,
         Func<IServiceProvider, BatchOptions> config) => (context, source) => next(context, provider =>
     {
         var stream = source(provider);
         var (batchMaxSize, timeWindowDuration) = config(provider);
-        return stream.Batch(() => new BoundedBatchBuilder<T>(batchMaxSize, timeWindowDuration));
+        return stream.Batch(batchMaxSize, timeWindowDuration);
     });
 }

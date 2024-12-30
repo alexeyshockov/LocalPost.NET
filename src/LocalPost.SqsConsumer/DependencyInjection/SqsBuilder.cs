@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using JetBrains.Annotations;
 using LocalPost.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,7 +18,7 @@ public sealed class SqsBuilder(IServiceCollection services)
     /// <param name="hf">Handler factory.</param>
     /// <returns>Pipeline options builder.</returns>
     public OptionsBuilder<DefaultBatchPipelineOptions> AddBatchConsumer(string name,
-        HandlerFactory<IEnumerable<ConsumeContext<string>>> hf)
+        HandlerFactory<ImmutableArray<ConsumeContext<string>>> hf)
     {
         var defaultPipeline = Pipeline
             .Create(hf, provider => provider.GetOptions<DefaultBatchPipelineOptions>(name))

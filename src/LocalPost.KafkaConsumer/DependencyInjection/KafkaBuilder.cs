@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Confluent.Kafka;
 using JetBrains.Annotations;
 using LocalPost.DependencyInjection;
@@ -18,7 +19,7 @@ public sealed class KafkaBuilder(IServiceCollection services)
     /// <param name="hf">Handler factory.</param>
     /// <returns>Pipeline options builder.</returns>
     public OptionsBuilder<DefaultBatchPipelineOptions> AddBatchConsumer(string name,
-        HandlerFactory<IEnumerable<ConsumeContext<byte[]>>> hf)
+        HandlerFactory<ImmutableArray<ConsumeContext<byte[]>>> hf)
     {
         var defaultPipeline = Pipeline
             .Create(hf, provider => provider.GetOptions<DefaultBatchPipelineOptions>(name))
