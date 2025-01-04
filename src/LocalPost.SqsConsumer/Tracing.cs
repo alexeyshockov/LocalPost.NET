@@ -9,7 +9,7 @@ internal static class MessageUtils
     public static void ExtractTraceField(object? carrier, string fieldName,
         out string? fieldValue, out IEnumerable<string>? fieldValues)
     {
-        fieldValues = default;
+        fieldValues = null;
         fieldValue = null;
         if (carrier is not Message message)
             return;
@@ -96,21 +96,6 @@ internal static class Tracing
         return activity;
     }
 
-    public static Activity? StartProcessing<T>(IReadOnlyCollection<ConsumeContext<T>> context)
-    {
-        var client = context.First().Client;
-        var activity = Source.StartActivity($"{client.QueueName} process", ActivityKind.Consumer);
-        if (activity is not { IsAllDataRequested: true })
-            return activity;
-
-        activity.SetDefaultTags(client);
-        activity.SetTagsFor(context);
-
-        // TODO Accept distributed tracing headers, per each message...
-
-        return activity;
-    }
-
     public static Activity? StartSettling<T>(ConsumeContext<T> context)
     {
         var activity = Source.StartActivity($"{context.Client.QueueName} settle", ActivityKind.Consumer);
@@ -119,19 +104,6 @@ internal static class Tracing
 
         activity.SetDefaultTags(context.Client);
         activity.SetTag("messaging.message.id", context.MessageId);
-
-        return activity;
-    }
-
-    public static Activity? StartSettling<T>(IReadOnlyCollection<ConsumeContext<T>> context)
-    {
-        var client = context.First().Client;
-        var activity = Source.StartActivity($"{client.QueueName} settle", ActivityKind.Consumer);
-        if (activity is not { IsAllDataRequested: true })
-            return activity;
-
-        activity.SetDefaultTags(client);
-        activity.SetTagsFor(context);
 
         return activity;
     }

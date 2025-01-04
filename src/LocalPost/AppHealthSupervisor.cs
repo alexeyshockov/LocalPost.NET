@@ -1,22 +1,22 @@
 using System.Collections.Immutable;
-using JetBrains.Annotations;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace LocalPost;
 
 [UsedImplicitly]
 internal sealed class AppHealthSupervisor(ILogger<AppHealthSupervisor> logger,
-    HealthCheckService healthChecker, IHostApplicationLifetime appLifetime) : IBackgroundService
+    HealthCheckService healthChecker, IHostApplicationLifetime appLifetime) : BackgroundService
 {
     public TimeSpan CheckInterval { get; init; } = TimeSpan.FromSeconds(1);
     public int ExitCode { get; init; } = 1;
     public IImmutableSet<string> Tags { get; init; } = ImmutableHashSet<string>.Empty;
 
-    public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
+    private Task<HealthReport> Check(CancellationToken ct = default) => Tags.Count == 0
+        ? healthChecker.CheckHealthAsync(ct)
+        : healthChecker.CheckHealthAsync(hcr => Tags.IsSubsetOf(hcr.Tags), ct);
 
-    public async Task ExecuteAsync(CancellationToken ct)
+    protected override async Task ExecuteAsync(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
@@ -32,10 +32,4 @@ internal sealed class AppHealthSupervisor(ILogger<AppHealthSupervisor> logger,
             await Task.Delay(CheckInterval, ct);
         }
     }
-
-    private Task<HealthReport> Check(CancellationToken ct = default) => Tags.Count == 0
-        ? healthChecker.CheckHealthAsync(ct)
-        : healthChecker.CheckHealthAsync(hcr => Tags.IsSubsetOf(hcr.Tags), ct);
-
-    public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
 }

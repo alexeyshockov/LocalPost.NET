@@ -1,16 +1,75 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace LocalPost;
 
 public static partial class HandlerStackEx
 {
-    // public static HandlerFactory<T> LogErrors<T>(this HandlerFactory<T> hf) => hf.Map(provider =>
-    //     ActivatorUtilities.CreateInstance<ErrorLoggingHandler<T>>(provider));
-
-    public static HandlerFactory<T> Scoped<T>(this HandlerFactory<T> hf) => provider =>
+    /// <summary>
+    ///     Handle exceptions and log them, to not break the consumer loop.
+    /// </summary>
+    /// <param name="hf">Handler factory to wrap.</param>
+    /// <typeparam name="T">Handler's payload type.</typeparam>
+    /// <returns>Wrapped handler factory.</returns>
+    public static HandlerFactory<T> LogExceptions<T>(this HandlerFactory<T> hf) => provider =>
     {
-        var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
-        return new ScopedHandler<T>(scopeFactory, hf).InvokeAsync;
+        var logger = provider.GetRequiredService<ILogger<T>>();
+        var next = hf(provider);
+
+        return async (context, ct) =>
+        {
+            try
+            {
+                await next(context, ct);
+            }
+            catch (OperationCanceledException e) when (e.CancellationToken == ct)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Unhandled exception while processing a message");
+            }
+        };
+    };
+
+    /// <summary>
+    ///     Create a DI scope for every message and resolve the handler from it.
+    /// </summary>
+    /// <param name="hf">Handler factory to wrap.</param>
+    /// <typeparam name="T">Handler's payload type.</typeparam>
+    /// <returns>Wrapped handler factory.</returns>
+    public static HandlerFactory<T> Scoped<T>(this HandlerFactory<T> hf) => provider =>
+        new ScopedHandler<T>(provider.GetRequiredService<IServiceScopeFactory>(), hf).InvokeAsync;
+
+    /// <summary>
+    ///     Shutdown the whole app on error.
+    /// </summary>
+    /// <param name="hf">Handler factory to wrap.</param>
+    /// <param name="exitCode">Process exit code.</param>
+    /// <typeparam name="T">Handler's payload type.</typeparam>
+    /// <returns>Wrapped handler factory.</returns>
+    public static HandlerFactory<T> ShutdownOnError<T>(this HandlerFactory<T> hf, int exitCode = 1) => provider =>
+    {
+        var appLifetime = provider.GetRequiredService<IHostApplicationLifetime>();
+        var next = hf(provider);
+
+        return async (context, ct) =>
+        {
+            try
+            {
+                await next(context, ct);
+            }
+            catch (OperationCanceledException e) when (e.CancellationToken == ct)
+            {
+                throw;
+            }
+            catch
+            {
+                appLifetime.StopApplication();
+                Environment.ExitCode = exitCode;
+            }
+        };
     };
 }
 
@@ -27,36 +86,3 @@ internal sealed class ScopedHandler<T>(IServiceScopeFactory sf, HandlerFactory<T
         await handler(payload, ct);
     }
 }
-
-// Too narrow use case in the first place, also easier to implement using a lambda
-// internal class ErrorLoggingHandler<T>(ILogger<T> logger) : IHandlerMiddleware<T, T>
-// {
-//     public Handler<T> Invoke(Handler<T> next) => async (context, ct) =>
-//     {
-//         try
-//         {
-//             await next(context, ct);
-//         }
-//         catch (OperationCanceledException e) when (e.CancellationToken == ct)
-//         {
-//             throw;
-//         }
-//         catch (Exception e)
-//         {
-//             logger.LogError(e, "Unhandled exception while processing a message");
-//         }
-//     };
-// }
-
-// TODO Just add it as an example, also using Polly
-//[PublicAPI]
-//public static class Middlewares
-//{
-//    public static Middleware<T> Timeout<T>(TimeSpan timeout) => next => async (context, ct) =>
-//    {
-//        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-//        cts.CancelAfter(timeout);
-//
-//        await next(context, cts.Token);
-//    };
-//}

@@ -82,7 +82,7 @@ public static class FingersCrossedLogging
             }
             catch (OperationCanceledException e) when (e.CancellationToken == ct)
             {
-                throw; // Not a real error
+                throw; // Do not treat cancellation as an error
             }
             catch (Exception)
             {

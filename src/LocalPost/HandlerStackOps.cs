@@ -1,18 +1,9 @@
-using JetBrains.Annotations;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-
 namespace LocalPost;
 
 [PublicAPI]
-public static partial class HandlerStackEx
+public static class HandlerStackOps
 {
-    // Better use a lambda in place, see Scoped() middleware
-    // public static HandlerFactory<TIn> Map<TIn, TOut>(this HandlerFactory<TOut> hf,
-    //     HandlerFactoryMiddleware<TIn, TOut> middleware) => middleware(hf);
-
-    // Just resolve it manually, it's one line longer, same cognitive load or even less,
-    // and one additional type less
+    // Just resolve it manually, it's one line longer, same cognitive load or even less, and one additional type less
     // public static HandlerFactory<TIn> Map<TIn, TOut>(this HandlerFactory<TOut> hf,
     //     HandlerMiddlewareFactory<TIn, TOut> middlewareFactory) => provider =>
     // {
@@ -22,7 +13,7 @@ public static partial class HandlerStackEx
     //     return m(h);
     // };
 
-    // Too narrow use case, but makes the Map() method inconvenient to use
+    // Too narrow use case, and makes Map() inconvenient to use
     // public static HandlerFactory<TIn> Map<TIn, TOut>(this HandlerFactory<TOut> hf,
     //     Func<IServiceProvider, IHandlerMiddleware<TIn, TOut>> middlewareFactory) => hf.Map<TIn, TOut>(provider =>
     //     middlewareFactory(provider).Invoke);
@@ -32,6 +23,9 @@ public static partial class HandlerStackEx
     //     var handler = hf(provider);
     //     return middlewareFactory(provider).Invoke(handler);
     // };
+    // public static HandlerFactory<TIn> Map<TIn, TOut>(this HandlerFactory<TOut> hf,
+    //     where T : IHandlerMiddleware<TIn, TOut> => hf.Map<TIn, TOut>(provider =>
+    //     ActivatorUtilities.CreateInstance<T>(provider).Invoke);
 
     public static HandlerFactory<TIn> Map<TIn, TOut>(this HandlerFactory<TOut> hf,
         HandlerMiddleware<TIn, TOut> middleware) => provider =>
@@ -42,13 +36,6 @@ public static partial class HandlerStackEx
 
     public static HandlerFactory<T> Touch<T>(this HandlerFactory<T> hf,
         HandlerMiddleware<T, T> middleware) => hf.Map(middleware);
-
-    // No need, just use a lambda in place
-    // public static HandlerFactory<TIn> Map<TIn, TOut>(this HandlerFactory<TOut> hf,
-    //     where T : IHandlerMiddleware<TIn, TOut> => hf.Map<TIn, TOut>(provider =>
-    //     ActivatorUtilities.CreateInstance<T>(provider).Invoke);
-    //
-    // public static HandlerFactory<T> Scoped<T>(this HandlerFactory<T> hf) => hf.Map(ScopedHandler.Wrap);
 
     public static HandlerFactory<T> Dispose<T>(this HandlerFactory<T> hf) where T : IDisposable =>
         hf.Touch(next => async (context, ct) =>
@@ -84,27 +71,4 @@ public static partial class HandlerStackEx
 
             await next(context, ct);
         });
-
-    public static HandlerFactory<T> ShutdownOnError<T>(this HandlerFactory<T> hf, int exitCode = 1) => provider =>
-    {
-        var appLifetime = provider.GetRequiredService<IHostApplicationLifetime>();
-        var next = hf(provider);
-
-        return async (context, ct) =>
-        {
-            try
-            {
-                await next(context, ct);
-            }
-            catch (OperationCanceledException e) when (e.CancellationToken == ct)
-            {
-                throw;
-            }
-            catch
-            {
-                appLifetime.StopApplication();
-                Environment.ExitCode = exitCode;
-            }
-        };
-    };
 }

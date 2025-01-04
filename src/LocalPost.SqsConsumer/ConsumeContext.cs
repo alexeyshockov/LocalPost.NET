@@ -1,16 +1,6 @@
-using System.Collections.Immutable;
 using Amazon.SQS.Model;
-using JetBrains.Annotations;
-using LocalPost.AsyncEnumerable;
 
 namespace LocalPost.SqsConsumer;
-
-// internal static class ConsumeContext
-// {
-//     public static BatchBuilderFactory<ConsumeContext<string>, BatchConsumeContext<string>> BatchBuilder(
-//         MaxSize batchMaxSizeSize, TimeSpan timeWindow) => ct =>
-//         new BatchConsumeContext<string>.Builder(batchMaxSizeSize, timeWindow, ct);
-// }
 
 [PublicAPI]
 public readonly record struct ConsumeContext<T>
@@ -57,45 +47,11 @@ public readonly record struct ConsumeContext<T>
         Transform(await transform(this));
 
     public static implicit operator T(ConsumeContext<T> context) => context.Payload;
-}
 
-// [PublicAPI]
-// public readonly record struct BatchConsumeContext<T>
-// {
-//     internal sealed class Builder(MaxSize batchMaxSize, TimeSpan timeWindowDuration)
-//         : BoundedBatchBuilderBase<ConsumeContext<T>, BatchConsumeContext<T>>(batchMaxSize, timeWindowDuration)
-//     {
-//         // TODO Batch.DrainToImmutable()
-//         public override BatchConsumeContext<T> Build() => new(Batch.DrainToImmutable());
-//     }
-//
-//     public readonly ImmutableArray<ConsumeContext<T>> Messages;
-//
-//     public int Count => Messages.Length;
-//
-//     internal BatchConsumeContext(ImmutableArray<ConsumeContext<T>> messages)
-//     {
-//         if (messages.Length == 0)
-//             throw new ArgumentException("Batch must contain at least one message", nameof(messages));
-//
-//         Messages = messages;
-//     }
-//
-//     public BatchConsumeContext<TOut> Transform<TOut>(IEnumerable<ConsumeContext<TOut>> payload) => new(payload.ToImmutableArray());
-//
-//     public BatchConsumeContext<TOut> Transform<TOut>(IEnumerable<TOut> batchPayload) =>
-//         Transform(Messages.Zip(batchPayload, (message, payload) => message.Transform(payload)));
-//
-//     public BatchConsumeContext<TOut> Transform<TOut>(Func<ConsumeContext<T>, TOut> transform) =>
-//         // Parallel LINQ?..
-//         Transform(Messages.Select(transform));
-//
-//     public async Task<BatchConsumeContext<TOut>> Transform<TOut>(Func<ConsumeContext<T>, Task<TOut>> transform)
-//     {
-//         // TODO AsSpan, to immutable array without allocations
-//         var messages = await Task.WhenAll(Messages.Select(transform));
-//         return Transform(messages);
-//     }
-//
-//     internal QueueClient Client => Messages[0].Client;
-// }
+    public Task DeleteMessage(CancellationToken ct = default) => Client.DeleteMessage(this, ct);
+
+    public Task Acknowledge(CancellationToken ct = default) => DeleteMessage(ct);
+
+    // public Task ChangeMessageVisibility(TimeSpan visibilityTimeout, CancellationToken ct = default) =>
+    //     Client.ChangeMessageVisibility(this, visibilityTimeout, ct);
+}

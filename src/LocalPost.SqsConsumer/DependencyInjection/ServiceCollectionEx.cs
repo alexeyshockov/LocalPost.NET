@@ -1,5 +1,3 @@
-using JetBrains.Annotations;
-using LocalPost.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LocalPost.SqsConsumer.DependencyInjection;
@@ -13,8 +11,4 @@ public static class ServiceCollectionEx
 
         return services;
     }
-
-    internal static bool TryAddQueueClient(this IServiceCollection services, string name) =>
-        services.TryAddNamedSingleton(name, provider =>
-            ActivatorUtilities.CreateInstance<QueueClient>(provider, name));
 }

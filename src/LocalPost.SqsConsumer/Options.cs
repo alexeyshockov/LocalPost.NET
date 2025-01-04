@@ -57,6 +57,10 @@ public sealed class EndpointOptions
 [PublicAPI]
 public sealed class ConsumerOptions
 {
+    [Range(1, ushort.MaxValue)]
+    // public ushort MaxConcurrency { get; set; } = 10;
+    public ushort Consumers { get; set; } = 1;
+
     /// <summary>
     ///     Time to wait for available messages in the queue. 0 is short pooling, where 1..20 activates long pooling.
     ///     Default is 20.
@@ -71,8 +75,11 @@ public sealed class ConsumerOptions
     public byte WaitTimeSeconds { get; set; } = 20;
 
     /// <summary>
-    ///     The maximum number of messages to return. Amazon SQS never returns more messages than this value (however,
-    ///     fewer messages might be returned). Valid values: 1 to 10. Default is 1.
+    ///     The maximum number of messages to return. Valid values: 1 to 10. Default is 10.
+    ///
+    ///     Amazon SQS never returns more messages than this value (however, fewer messages might be returned).
+    ///
+    ///     All the returned messages will be processed concurrently.
     /// </summary>
     /// <see href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html">
     ///     Amazon SQS short and long polling
@@ -128,52 +135,4 @@ public sealed class ConsumerOptions
                 QueueName = url.Segments[2];
         }
     }
-}
-
-[PublicAPI]
-public sealed class DefaultPipelineOptions
-{
-    public ConsumerOptions Consume { get; } = new();
-
-    [Range(1, ushort.MaxValue)]
-    public ushort MaxConcurrency { get; set; } = 10;
-
-    [Range(1, ushort.MaxValue)]
-    public ushort Prefetch { get; set; } = 10;
-
-    public static implicit operator Pipeline.ConsumerOptions(DefaultPipelineOptions options) => new()
-    {
-        MaxConcurrency = options.MaxConcurrency,
-        BreakOnException = false,
-    };
-}
-
-[PublicAPI]
-public sealed record DefaultBatchPipelineOptions
-{
-    public ConsumerOptions Consume { get; } = new();
-
-    [Range(1, ushort.MaxValue)]
-    public ushort MaxConcurrency { get; set; } = 10;
-
-    [Range(1, ushort.MaxValue)]
-    public ushort Prefetch { get; set; } = 10;
-
-    [Range(1, ushort.MaxValue)]
-    public ushort BatchMaxSize { get; set; } = 10;
-
-    [Range(1, ushort.MaxValue)]
-    public int TimeWindowMs { get; set; } = 1_000;
-
-    public static implicit operator Pipeline.ConsumerOptions(DefaultBatchPipelineOptions options) => new()
-    {
-        MaxConcurrency = options.MaxConcurrency,
-        BreakOnException = false,
-    };
-
-    public static implicit operator BatchOptions(DefaultBatchPipelineOptions options) => new()
-    {
-        MaxSize = options.BatchMaxSize,
-        TimeWindowDuration = options.TimeWindowMs,
-    };
 }

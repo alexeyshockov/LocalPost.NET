@@ -7,6 +7,10 @@ internal static class ActivityEx
     // See https://github.com/open-telemetry/opentelemetry-dotnet/blob/core-1.8.1/src/OpenTelemetry.Api/Trace/ActivityExtensions.cs#L81-L105
     public static Activity? Error(this Activity? activity, Exception ex, bool escaped = true)
     {
+        activity?.SetTag("otel.status_code", "ERROR");
+        // activity.SetTag("otel.status_description", ex is PostgresException pgEx ? pgEx.SqlState : ex.Message);
+        activity?.SetTag("otel.status_description", ex.Message);
+
         var tags = new ActivityTagsCollection
         {
             { "exception.type", ex.GetType().FullName },
@@ -15,10 +19,6 @@ internal static class ActivityEx
             { "exception.escaped", escaped }
         };
         activity?.AddEvent(new ActivityEvent("exception", tags: tags));
-
-        activity?.SetTag("otel.status_code", "ERROR");
-        // activity.SetTag("otel.status_description", ex is PostgresException pgEx ? pgEx.SqlState : ex.Message);
-        activity?.SetTag("otel.status_description", ex.Message);
 
         return activity;
     }

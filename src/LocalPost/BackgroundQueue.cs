@@ -1,20 +1,22 @@
+using System.Threading.Channels;
+using LocalPost.BackgroundQueue;
+
 namespace LocalPost;
 
 /// <summary>
-///     Entrypoint for the background queue, inject it where you need to enqueue items.
+///     Background queue publisher.
 /// </summary>
-/// <typeparam name="T"></typeparam>
-public interface IBackgroundQueue<in T>
+/// <typeparam name="T">Payload type.</typeparam>
+public interface IBackgroundQueue<T>
 {
-    // TODO Custom exception when closed?.. Or just return true/false?..
     ValueTask Enqueue(T payload, CancellationToken ct = default);
+
+    ChannelWriter<ConsumeContext<T>> Writer { get; }
 }
-
-
 
 public delegate Task BackgroundJob(CancellationToken ct);
 
 /// <summary>
-///     Just a convenient alias for <see cref="IBackgroundQueue{T}" />.
+///     Just a convenient alias for <see cref="IBackgroundQueue{BackgroundJob}" /> queue.
 /// </summary>
 public interface IBackgroundJobQueue : IBackgroundQueue<BackgroundJob>;

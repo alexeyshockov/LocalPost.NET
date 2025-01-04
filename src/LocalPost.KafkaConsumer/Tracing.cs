@@ -10,7 +10,7 @@ internal static class MessageUtils
     public static void ExtractTraceFieldFromHeaders(object? carrier, string fieldName,
         out string? fieldValue, out IEnumerable<string>? fieldValues)
     {
-        fieldValues = default;
+        fieldValues = null;
         fieldValue = null;
         if (carrier is not IEnumerable<IHeader> message)
             return;
@@ -21,6 +21,7 @@ internal static class MessageUtils
     }
 }
 
+// See https://opentelemetry.io/docs/specs/semconv/messaging/kafka/
 internal static class KafkaActivityExtensions
 {
     public static void AcceptDistributedTracingFrom<TKey, TValue>(this Activity activity, Message<TKey, TValue> message)
@@ -42,34 +43,43 @@ internal static class KafkaActivityExtensions
             activity.AddBaggage(baggageItem.Key, baggageItem.Value);
     }
 
-    public static Activity? SetDefaultTags(this Activity? activity, KafkaTopicClient client)
+    public static Activity? SetDefaultTags(this Activity? activity, Client client)
     {
         // See https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/#messaging-attributes
         activity?.SetTag("messaging.system", "kafka");
 
-        activity?.SetTag("messaging.destination.name", client.Topic);
-        activity?.SetTag("messaging.kafka.consumer.group", client.GroupId);
+        // activity?.SetTag("messaging.kafka.consumer.group", context.ClientConfig.GroupId);
+        activity?.SetTag("messaging.consumer.group.name", client.Config.GroupId);
 
-        // activity?.SetTag("messaging.client_id", "service_name");
-        // activity?.SetTag("server.address", client.QueueUrl.Host);
-        // activity?.SetTag("server.port", client.QueueUrl.Port);
+        // activity?.SetTag("messaging.client.id", "service_name");
+        // activity?.SetTag("server.address", context.ClientConfig.BootstrapServers);
+        // activity?.SetTag("server.port", context.ClientConfig.BootstrapServers);
 
         return activity;
     }
 
     public static Activity? SetTagsFor<T>(this Activity? activity, ConsumeContext<T> context)
     {
+        // See https://github.com/open-telemetry/opentelemetry-specification/issues/2971#issuecomment-1324621326
         // activity?.SetTag("messaging.message.id", context.MessageId);
-        activity?.SetTag("messaging.kafka.message.offset", context.NextOffset.Offset.Value);
+        activity?.SetTag("messaging.destination.name", context.Topic);
+        activity?.SetTag("messaging.destination.partition.id", context.ConsumeResult.Partition.Value);
+        activity?.SetTag("messaging.kafka.message.offset", (long)context.ConsumeResult.Offset);
+
+        activity?.SetTag("messaging.message.body.size", context.Message.Value.Length);
+
+        // TODO messaging.operation.type
 
         // Skip, as we always ignore the key on consumption
         // activity.SetTag("messaging.kafka.message.key", context.Message.Key);
 
+        // TODO error.type
+
         return activity;
     }
 
-    public static Activity? SetTagsFor<T>(this Activity? activity, IReadOnlyCollection<ConsumeContext<T>> batch) =>
-        activity?.SetTag("messaging.batch.message_count", batch.Count);
+    // public static Activity? SetTagsFor<T>(this Activity? activity, IReadOnlyCollection<ConsumeContext<T>> batch) =>
+    //     activity?.SetTag("messaging.batch.message_count", batch.Count);
 }
 
 // Npgsql as an inspiration:
@@ -92,7 +102,7 @@ internal static class Tracing
 
     public static Activity? StartProcessing<T>(ConsumeContext<T> context)
     {
-        var activity = Source.CreateActivity($"{context.Client.Topic} process", ActivityKind.Consumer);
+        var activity = Source.CreateActivity($"{context.Topic} process", ActivityKind.Consumer);
         if (activity is { IsAllDataRequested: true })
         {
             activity.SetDefaultTags(context.Client);
@@ -101,22 +111,6 @@ internal static class Tracing
         }
 
         activity?.Start();
-
-        return activity;
-    }
-
-    public static Activity? StartProcessing<T>(IReadOnlyCollection<ConsumeContext<T>> batch)
-    {
-        var client = batch.First().Client;
-        // It is actually can be multiple topics, it is possible to subscribe using a pattern...
-        var activity = Source.StartActivity($"{client.Topic} process", ActivityKind.Consumer);
-        if (activity is not { IsAllDataRequested: true })
-            return activity;
-
-        activity.SetDefaultTags(client);
-        activity.SetTagsFor(batch);
-
-        // TODO Accept distributed tracing headers, per each message...
 
         return activity;
     }

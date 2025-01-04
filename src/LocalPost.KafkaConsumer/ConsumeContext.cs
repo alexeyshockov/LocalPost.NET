@@ -1,34 +1,24 @@
 using Confluent.Kafka;
-using JetBrains.Annotations;
-using LocalPost.AsyncEnumerable;
 
 namespace LocalPost.KafkaConsumer;
-
-// internal static class ConsumeContext
-// {
-//     public static BatchBuilderFactory<ConsumeContext<byte[]>, BatchConsumeContext<byte[]>> BatchBuilder(
-//         MaxSize batchMaxSize, TimeSpan timeWindow) => ct =>
-//         new BatchConsumeContext<byte[]>.Builder(batchMaxSize, timeWindow, ct);
-// }
 
 [PublicAPI]
 public readonly record struct ConsumeContext<T>
 {
-    internal readonly KafkaTopicClient Client;
     // librdkafka docs:
-    //  When consumer restarts this is where it will start consuming from.
-    //  The committed offset should be last_message_offset+1.
+    //   When consumer restarts this is where it will start consuming from.
+    //   The committed offset should be last_message_offset+1.
     // See https://github.com/confluentinc/librdkafka/wiki/Consumer-offset-management#terminology
-    internal readonly TopicPartitionOffset NextOffset;
-    internal readonly Message<Ignore, byte[]> Message;
+//    internal readonly TopicPartitionOffset NextOffset;
+
+    internal readonly Client Client;
+    internal readonly ConsumeResult<Ignore, byte[]> ConsumeResult;
     public readonly T Payload;
 
-    internal ConsumeContext(KafkaTopicClient client, TopicPartitionOffset nextOffset, Message<Ignore, byte[]> message,
-        T payload)
+    internal ConsumeContext(Client client, ConsumeResult<Ignore, byte[]> consumeResult, T payload)
     {
         Client = client;
-        NextOffset = nextOffset;
-        Message = message;
+        ConsumeResult = consumeResult;
         Payload = payload;
     }
 
@@ -38,11 +28,15 @@ public readonly record struct ConsumeContext<T>
         headers = Headers;
     }
 
-    public string Topic => Client.Topic;
+    public Offset NextOffset => ConsumeResult.Offset + 1;
+
+    public Message<Ignore, byte[]> Message => ConsumeResult.Message;
+
+    public string Topic => ConsumeResult.Topic;
 
     public IReadOnlyList<IHeader> Headers => Message.Headers.BackingList;
 
-    public ConsumeContext<TOut> Transform<TOut>(TOut payload) => new(Client, NextOffset, Message, payload);
+    public ConsumeContext<TOut> Transform<TOut>(TOut payload) => new(Client, ConsumeResult, payload);
 
     public ConsumeContext<TOut> Transform<TOut>(Func<ConsumeContext<T>, TOut> transform) => Transform(transform(this));
 
@@ -50,58 +44,9 @@ public readonly record struct ConsumeContext<T>
         Transform(await transform(this));
 
     public static implicit operator T(ConsumeContext<T> context) => context.Payload;
-}
 
-// [PublicAPI]
-// public readonly record struct BatchConsumeContext<T>
-// {
-//     internal sealed class Builder(MaxSize batchMaxSize, TimeSpan timeWindowDuration, CancellationToken ct = default)
-//         : BoundedBatchBuilderBase<ConsumeContext<T>, BatchConsumeContext<T>>(batchMaxSize, timeWindowDuration, ct)
-//     {
-//         public override BatchConsumeContext<T> Build()
-//         {
-// // #if NET6_0_OR_GREATER
-// //             ReadOnlySpan<T> s = CollectionsMarshal.AsSpan(Batch)
-// //             var ia = s.ToImmutableArray();
-// //             return new BatchConsumeContext<T>(Batch);
-// // #else
-// //             return new BatchConsumeContext<T>(Batch.ToImmutableArray());
-// // #endif
-//              return new BatchConsumeContext<T>(Batch);
-//         }
-//     }
-//
-//     // TODO ImmutableArray
-//     public readonly IReadOnlyList<ConsumeContext<T>> Messages;
-//
-//     internal BatchConsumeContext(IReadOnlyList<ConsumeContext<T>> messages)
-//     {
-//         if (messages.Count == 0)
-//             throw new ArgumentException("Batch must contain at least one message", nameof(messages));
-//
-//         Messages = messages;
-//     }
-//
-//     public BatchConsumeContext<TOut> Transform<TOut>(ConsumeContext<TOut>[] payload) => new(payload);
-//
-//     public BatchConsumeContext<TOut> Transform<TOut>(IEnumerable<ConsumeContext<TOut>> payload) =>
-//         Transform(payload.ToArray());
-//
-//     public BatchConsumeContext<TOut> Transform<TOut>(IEnumerable<TOut> batchPayload) =>
-//         Transform(Messages.Zip(batchPayload, (message, payload) => message.Transform(payload)));
-//
-//     public BatchConsumeContext<TOut> Transform<TOut>(Func<ConsumeContext<T>, TOut> transform)
-//     {
-//         // TODO Parallel LINQ
-//         var messages = Messages.Select(transform);
-//         return Transform(messages);
-//     }
-//
-//     public async Task<BatchConsumeContext<TOut>> Transform<TOut>(Func<ConsumeContext<T>, Task<TOut>> transform)
-//     {
-//         var messages = await Task.WhenAll(Messages.Select(transform));
-//         return Transform(messages);
-//     }
-//
-//     internal KafkaTopicClient Client => Messages[^1].Client;
-// }
+    public void StoreOffset() => Client.Consumer.StoreOffset(ConsumeResult);
+
+    // To be consistent across different message brokers
+    public void Acknowledge() => StoreOffset();
+}

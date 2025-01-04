@@ -1,14 +1,6 @@
 using System.Diagnostics;
-using JetBrains.Annotations;
 
 namespace LocalPost.BackgroundQueue;
-
-// public static class PipelineOps
-// {
-//     public static PipelineRegistration<T> Batch<T>(this PipelineRegistration<IReadOnlyCollection<T>> next,
-//         ushort batchMaxSize = 10, int timeWindowDuration = 1_000) => next.Map<T, IReadOnlyCollection<T>>((stream, _) =>
-//         stream.Batch(() => new BoundedBatchBuilder<T>(batchMaxSize, timeWindowDuration)));
-// }w
 
 [PublicAPI]
 public static class HandlerStackEx

@@ -1,5 +1,3 @@
-using JetBrains.Annotations;
-using LocalPost.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LocalPost.KafkaConsumer.DependencyInjection;
@@ -13,12 +11,4 @@ public static class ServiceCollectionEx
 
         return services;
     }
-
-    internal static bool TryAddKafkaClient(this IServiceCollection services, string name) =>
-        services.TryAddNamedSingleton(name, provider =>
-        {
-            var options = provider.GetOptions<ConsumerOptions>(name);
-
-            return new KafkaTopicClient(provider.GetLoggerFor<KafkaTopicClient>(), options, options.Topic, name);
-        });
 }
