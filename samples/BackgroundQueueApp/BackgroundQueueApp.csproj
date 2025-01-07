@@ -9,12 +9,11 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="7.*" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\LocalPost\LocalPost.csproj" />
-        <ProjectReference Include="..\..\src\LocalPost.Resilience\LocalPost.Resilience.csproj" />
     </ItemGroup>
 
     <ItemGroup>

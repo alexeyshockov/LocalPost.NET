@@ -32,6 +32,15 @@ public static partial class ServiceCollectionEx
 
 internal static partial class HealthChecks
 {
+    private sealed class LambdaHealthCheck(Func<HealthCheckResult> check) : IHealthCheck
+    {
+        public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default) =>
+            Task.FromResult(check());
+    }
+
+    public static IHealthCheck From(Func<HealthCheckResult> check) =>
+        new LambdaHealthCheck(check);
+
     public static HealthCheckRegistration Readiness<T>(string name,
         HealthStatus? failureStatus = null, IEnumerable<string>? tags = null)
         where T : IHealthAwareService =>

@@ -10,24 +10,25 @@ volumes:
 services:
   localstack:
     # https://docs.localstack.cloud/getting-started/installation/#docker-compose
-    image: localstack/localstack:3.4
+    image: localstack/localstack:4
     ports:
-      - 127.0.0.1:4566:4566           # LocalStack Gateway
-      - 127.0.0.1:4510-4559:4510-4559 # External services port range
+      - "127.0.0.1:4566:4566"           # LocalStack Gateway
+      - "127.0.0.1:4510-4559:4510-4559" # External services port range
     environment:
       # LocalStack configuration: https://docs.localstack.cloud/references/configuration/
       - DEBUG=${DEBUG:-0}
       - SERVICES=sqs
     volumes:
+      # Local volume
       - localstack:/var/lib/localstack
-      # https://docs.localstack.cloud/references/init-hooks/
+      # Fixtures, see https://docs.localstack.cloud/references/init-hooks/
       - ./localstack/init/ready.d:/etc/localstack/init/ready.d" # SQS hooks
       # Only needed for Lambdas
 #      - /var/run/docker.sock:/var/run/docker.sock
   redpanda:
     # Mainly from: https://docs.redpanda.com/redpanda-labs/docker-compose/single-broker/
     # See also: https://docs.redpanda.com/current/deploy/deployment-option/self-hosted/docker-image/
-    image: docker.redpanda.com/redpandadata/redpanda:v24.1.5
+    image: docker.redpanda.com/redpandadata/redpanda:v24.3.2
     container_name: redpanda
     command:
       - redpanda start
@@ -48,10 +49,10 @@ services:
       - --rpc-addr redpanda:33145
       - --advertise-rpc-addr redpanda:33145
     ports:
-      - 18081:18081
-      - 18082:18082
-      - 19092:19092
-      - 19644:9644
+      - "18081:18081"
+      - "18082:18082"
+      - "19092:19092"
+      - "19644:9644"
     volumes:
       - redpanda:/var/lib/redpanda/data
     networks:
@@ -63,7 +64,7 @@ services:
 #      retries: 5
 #      start_period: 5s
   redpanda-console:
-    image: docker.redpanda.com/redpandadata/console:v2.5.2
+    image: docker.redpanda.com/redpandadata/console:v2.8.1
     entrypoint: /bin/sh
     command: -c "echo \"$$CONSOLE_CONFIG_FILE\" > /tmp/config.yml; /app/console"
     environment:
@@ -84,7 +85,7 @@ services:
             - name: local-connect-cluster
               url: http://connect:8083
     ports:
-      - 8080:8080
+      - "8080:8080"
     networks:
       - redpanda_network
     depends_on:

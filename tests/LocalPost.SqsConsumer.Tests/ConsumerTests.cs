@@ -5,7 +5,6 @@ using LocalPost.SqsConsumer.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Testcontainers.LocalStack;
-using Xunit.Abstractions;
 
 namespace LocalPost.SqsConsumer.Tests;
 
@@ -13,18 +12,18 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
 {
     // Called for each test, since each test instantiates a new class instance
     private readonly LocalStackContainer _container = new LocalStackBuilder()
-        .WithImage("localstack/localstack:3.4")
+        .WithImage("localstack/localstack:4")
         .WithEnvironment("SERVICES", "sqs")
         .Build();
 
+    private readonly AWSCredentials _credentials = new BasicAWSCredentials("LSIAQAAAAAAVNCBMPNSG", "any");
 
     private const string QueueName = "weather-forecasts";
 
     private string? _queueUrl;
 
-    private IAmazonSQS CreateClient() =>
-        new AmazonSQSClient(new BasicAWSCredentials("LSIAQAAAAAAVNCBMPNSG", "any"),
-            new AmazonSQSConfig { ServiceURL = _container.GetConnectionString() });
+    private IAmazonSQS CreateClient() => new AmazonSQSClient(_credentials,
+        new AmazonSQSConfig { ServiceURL = _container.GetConnectionString() });
 
     public async Task InitializeAsync()
     {
@@ -48,17 +47,17 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
             .AddDefaultAWSOptions(new AWSOptions()
             {
                 DefaultClientConfig = { ServiceURL = _container.GetConnectionString() },
-                Credentials = new BasicAWSCredentials("LSIAQAAAAAAVNCBMPNSG", "any")
+                Credentials = _credentials,
             })
             .AddAWSService<IAmazonSQS>()
-            .AddSqsConsumers(sqs => sqs.AddConsumer(QueueName, HandlerStack.For<string>(async (payload, _) =>
-                {
-                    received.Add(payload);
-                })
-                .UseSqsPayload()
-                .Acknowledge()
-                .Scoped()
-                .Trace()));
+            .AddSqsConsumers(sqs => sqs.AddConsumer(QueueName,
+                HandlerStack.For<string>(payload => received.Add(payload))
+                    .Scoped()
+                    .UseSqsPayload()
+                    .Trace()
+                    .LogExceptions()
+                    .Acknowledge() // Acknowledge in any case, because we caught any possible exceptions before
+            ));
 
         var host = hostBuilder.Build();
 

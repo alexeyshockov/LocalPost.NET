@@ -5,7 +5,7 @@ public class PrimitivesTests
     [Fact]
     public void MaxSize_implicit_conversion()
     {
-        MaxSize batchSize = default;
+        PositiveInt batchSize = default;
         int value = batchSize;
         value.Should().Be(1);
 

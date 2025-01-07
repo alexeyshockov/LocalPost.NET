@@ -19,28 +19,16 @@ builder.Services
     .AddScoped<MessageHandler>()
     .AddSqsConsumers(sqs =>
     {
-        sqs.Defaults.Configure(options => options.MaxConcurrency = 100);
+        sqs.Defaults.Configure(options => options.MaxNumberOfMessages = 1);
         sqs.AddConsumer("weather-forecasts",
             HandlerStack.From<MessageHandler, WeatherForecast>()
                 .UseSqsPayload()
-                .DeserializeJson()
-                .Acknowledge()
                 .Scoped()
+                .DeserializeJson()
+                .Trace()
+                .Acknowledge() // Do not include DeleteMessage call in the OpenTelemetry root span (transaction)
                 .LogFingersCrossed()
-                .Trace());
-        sqs.Defaults.Configure(options => options.MaxConcurrency = 100);
-        sqs.AddConsumer("weather-forecasts",
-            Pipeline.Create(
-                HandlerStack.From<MessageHandler, WeatherForecast>()
-                    .UseSqsPayload()
-                    .DeserializeJson()
-                    .Acknowledge()
-                    .Scoped()
-                    .LogFingersCrossed()
-                    .Trace(),
-                maxConcurrency: 100,
-                breakOnException: false
-            ).Buffer(100)
+                .LogExceptions()
         );
     });
 
@@ -48,11 +36,6 @@ builder.Services
 await builder.Build().RunAsync();
 
 
-
-record ConsumerOptions
-{
-    public int MaxConcurrency { get; set; } = 1;
-}
 
 [UsedImplicitly]
 public record WeatherForecast(int TemperatureC, int TemperatureF, string Summary);

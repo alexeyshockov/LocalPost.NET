@@ -1,28 +1,25 @@
 using Confluent.Kafka;
 using LocalPost.DependencyInjection;
+using LocalPost.Flow;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 
 namespace LocalPost.KafkaConsumer;
 
-internal sealed class Consumer(string name, ILogger<Consumer> logger,
-    ClientFactory clientFactory, ConsumerOptions settings, Handler<ConsumeContext<byte[]>> handler)
+internal sealed class Consumer(string name, ILogger logger,
+    ClientFactory clientFactory, Handler<Event<ConsumeContext<byte[]>>> handler)
     : IHostedService, IHealthAwareService, IDisposable
 {
-    private sealed class ReadinessHealthCheck(Consumer consumer) : IHealthCheck
-    {
-        public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default) =>
-            Task.FromResult(consumer.Ready);
-    }
+    private Clients _clients = new([]);
 
     private CancellationTokenSource? _execTokenSource;
-    private Task? _execution;
+    private Task? _exec;
     private Exception? _execException;
     private string? _execExceptionDescription;
 
-    public string Name { get; } = name;
+    private CancellationToken _completionToken = CancellationToken.None;
 
-    private HealthCheckResult Ready => (_execTokenSource, _execution, _execException) switch
+    private HealthCheckResult Ready => (_execTokenSource, _execution: _exec, _execException) switch
     {
         (null, _, _) => HealthCheckResult.Unhealthy("Not started"),
         (_, { IsCompleted: true }, _) => HealthCheckResult.Unhealthy("Stopped"),
@@ -31,7 +28,7 @@ internal sealed class Consumer(string name, ILogger<Consumer> logger,
         (_, _, not null) => HealthCheckResult.Unhealthy(_execExceptionDescription, _execException),
     };
 
-    public IHealthCheck ReadinessCheck => new ReadinessHealthCheck(this);
+    public IHealthCheck ReadinessCheck => HealthChecks.From(() => Ready);
 
     private async Task RunConsumerAsync(Client client, CancellationToken execToken)
     {
@@ -42,7 +39,8 @@ internal sealed class Consumer(string name, ILogger<Consumer> logger,
             while (!execToken.IsCancellationRequested)
             {
                 var result = client.Consume(execToken);
-                await handler(new ConsumeContext<byte[]>(client, result, result.Message.Value), CancellationToken.None);
+                await handler(new ConsumeContext<byte[]>(client, result, result.Message.Value), CancellationToken.None)
+                    .ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException e) when (e.CancellationToken == execToken)
@@ -72,27 +70,36 @@ internal sealed class Consumer(string name, ILogger<Consumer> logger,
             throw new InvalidOperationException("Service is already started");
 
         var execTokenSource = _execTokenSource = new CancellationTokenSource();
-        var execution = settings.Consumers switch
-        {
-            1 => await StartConsumerAsync(),
-            _ => Task.WhenAll(
-                await Task.WhenAll(Enumerable.Range(0, settings.Consumers).Select(_ => StartConsumerAsync())))
-        };
-        _execution = ObserveExecution();
+
+        logger.LogInformation("Starting Kafka consumer...");
+        var clients = _clients = await clientFactory.Create(ct).ConfigureAwait(false);
+        logger.LogInformation("Kafka consumer started");
+
+        logger.LogDebug("Invoking the event handler...");
+        await handler(Event<ConsumeContext<byte[]>>.Begin, ct).ConfigureAwait(false);
+        logger.LogDebug("Event handler started");
+
+        _exec = ObserveExecution();
         return;
-
-        async Task<Task> StartConsumerAsync()
-        {
-            var kafkaClient = await Task.Run(() => clientFactory.Create(settings.ClientConfig, settings.Topics), ct);
-
-            return Task.Run(() => RunConsumerAsync(kafkaClient, execTokenSource.Token), ct);
-        }
 
         async Task ObserveExecution()
         {
-            await execution;
-            // Can happen before the service shutdown, in case of an error
-            logger.LogInformation("Kafka consumer stopped");
+            try
+            {
+                var executions = clients.Select(client =>
+                    Task.Run(() => RunConsumerAsync(client, execTokenSource.Token), ct)
+                ).ToArray();
+                await (executions.Length == 1 ? executions[0] : Task.WhenAll(executions)).ConfigureAwait(false);
+
+                // TODO Pass the exception (if any) to the handler
+                await handler(Event<ConsumeContext<byte[]>>.End, _completionToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                // Can happen before the service shutdown, in case of an error
+                await _clients.Close(_completionToken).ConfigureAwait(false);
+                logger.LogInformation("Kafka consumer stopped");
+            }
         }
     }
 
@@ -104,14 +111,17 @@ internal sealed class Consumer(string name, ILogger<Consumer> logger,
         if (_execTokenSource is null)
             throw new InvalidOperationException("Service has not been started");
 
-        logger.LogInformation("Shutting down Kafka consumer");
+        logger.LogInformation("Shutting down Kafka consumer...");
+
+        _completionToken = forceShutdownToken;
         CancelExecution();
-        if (_execution is not null)
-            await _execution.ConfigureAwait(false);
+        if (_exec is not null)
+            await _exec.ConfigureAwait(false);
     }
 
     public void Dispose()
     {
         _execTokenSource?.Dispose();
+        _exec?.Dispose();
     }
 }

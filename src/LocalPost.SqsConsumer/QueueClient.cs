@@ -42,9 +42,9 @@ internal sealed class QueueClient(ILogger logger, IAmazonSQS sqs, ConsumerOption
     {
         if (string.IsNullOrEmpty(options.QueueUrl))
             // Checking for a possible error in the response would be also good...
-            _queueUrl = (await sqs.GetQueueUrlAsync(options.QueueName, ct)).QueueUrl;
+            _queueUrl = (await sqs.GetQueueUrlAsync(options.QueueName, ct).ConfigureAwait(false)).QueueUrl;
 
-        await FetchQueueAttributes(ct);
+        await FetchQueueAttributes(ct).ConfigureAwait(false);
     }
 
     private async Task FetchQueueAttributes(CancellationToken ct)
@@ -52,7 +52,7 @@ internal sealed class QueueClient(ILogger logger, IAmazonSQS sqs, ConsumerOption
         try
         {
             // Checking for a possible error in the response would be also good...
-            _queueAttributes = await sqs.GetQueueAttributesAsync(QueueUrl, ["All"], ct);
+            _queueAttributes = await sqs.GetQueueAttributesAsync(QueueUrl, ["All"], ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException e) when (e.CancellationToken == ct)
         {
@@ -65,7 +65,7 @@ internal sealed class QueueClient(ILogger logger, IAmazonSQS sqs, ConsumerOption
     }
 
     public async Task<IEnumerable<Message>> PullMessages(CancellationToken ct) =>
-        await _pipeline.ExecuteAsync(PullMessagesCore, ct);
+        await _pipeline.ExecuteAsync(PullMessagesCore, ct).ConfigureAwait(false);
 
     private async ValueTask<IEnumerable<Message>> PullMessagesCore(CancellationToken ct)
     {
@@ -82,9 +82,10 @@ internal sealed class QueueClient(ILogger logger, IAmazonSQS sqs, ConsumerOption
                 MaxNumberOfMessages = options.MaxNumberOfMessages,
                 AttributeNames = options.AttributeNames,
                 MessageAttributeNames = options.MessageAttributeNames,
-            }, ct);
+            }, ct).ConfigureAwait(false);
 
             activity?.SetTagsFor(response);
+            activity?.Success();
 
             return response.Messages;
         }
@@ -102,7 +103,7 @@ internal sealed class QueueClient(ILogger logger, IAmazonSQS sqs, ConsumerOption
     public async Task DeleteMessage<T>(ConsumeContext<T> context, CancellationToken ct = default)
     {
         using var activity = Tracing.StartSettling(context);
-        await sqs.DeleteMessageAsync(QueueUrl, context.ReceiptHandle, ct);
+        await sqs.DeleteMessageAsync(QueueUrl, context.ReceiptHandle, ct).ConfigureAwait(false);
 
         // TODO Log failures?..
     }

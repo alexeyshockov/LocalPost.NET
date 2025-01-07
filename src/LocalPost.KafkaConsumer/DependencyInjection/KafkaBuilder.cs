@@ -1,5 +1,6 @@
 using Confluent.Kafka;
 using LocalPost.DependencyInjection;
+using LocalPost.Flow;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -11,41 +12,63 @@ public sealed class KafkaBuilder(IServiceCollection services)
     public OptionsBuilder<ClientConfig> Defaults { get; } = services.AddOptions<ClientConfig>();
 
     /// <summary>
-    ///     Add a Kafka consumer with <typeparamref name="THandler"/> (should be registered separately) as a message handler.
+    ///     Add a Kafka consumer with a custom message handler.
     /// </summary>
-    /// <param name="name">Consumer name (should be unique in the application).</param>
-    /// <typeparam name="THandler">Message handler type.</typeparam>
+    /// <param name="hf">Message handler factory.</param>
     /// <returns>Consumer options builder.</returns>
-    public OptionsBuilder<ConsumerOptions> AddConsumer<THandler>(string name)
-        where THandler : IHandler<ConsumeContext<byte[]>>
-        => AddConsumer(name, provider => provider.GetRequiredService<THandler>().InvokeAsync);
+    public OptionsBuilder<ConsumerOptions> AddConsumer(HandlerFactory<ConsumeContext<byte[]>> hf) =>
+        AddConsumer(Options.DefaultName, hf);
 
     /// <summary>
     ///     Add a Kafka consumer with a custom message handler.
     /// </summary>
-    /// <param name="name">Consumer name (should be unique in the application).</param>
     /// <param name="hf">Message handler factory.</param>
     /// <returns>Consumer options builder.</returns>
-    public OptionsBuilder<ConsumerOptions> AddConsumer(string name, HandlerFactory<ConsumeContext<byte[]>> hf)
+    public OptionsBuilder<ConsumerOptions> AddConsumer(HandlerFactory<Event<ConsumeContext<byte[]>>> hf) =>
+        AddConsumer(Options.DefaultName, hf);
+
+    /// <summary>
+    ///     Add a Kafka consumer with a custom message handler.
+    /// </summary>
+    /// <param name="name">Consumer name (should be unique in the application). Also, the default group ID.</param>
+    /// <param name="hf">Message handler factory.</param>
+    /// <returns>Consumer options builder.</returns>
+    public OptionsBuilder<ConsumerOptions> AddConsumer(string name, HandlerFactory<ConsumeContext<byte[]>> hf) =>
+        AddConsumer(name, hf.SelectMessageEvent());
+
+    /// <summary>
+    ///     Add a Kafka consumer with a custom message handler.
+    /// </summary>
+    /// <param name="name">Consumer name (should be unique in the application). Also, the default group ID.</param>
+    /// <param name="hf">Message handler factory.</param>
+    /// <returns>Consumer options builder.</returns>
+    public OptionsBuilder<ConsumerOptions> AddConsumer(string name, HandlerFactory<Event<ConsumeContext<byte[]>>> hf)
     {
-        if (string.IsNullOrEmpty(name)) // TODO Just default (empty?) name...
-            throw new ArgumentException("A proper (non empty) name is required", nameof(name));
+        var added = services.TryAddKeyedSingleton(name, (provider, _) =>
+        {
+            var clientFactory = new ClientFactory(
+                provider.GetLoggerFor<Client>(),
+                provider.GetOptions<ConsumerOptions>(name)
+            );
 
-        services.TryAddSingleton<ClientFactory>();
-
-        var added = services.TryAddKeyedSingleton(name, (provider, _) => new Consumer(name,
-            provider.GetLoggerFor<Consumer>(),
-            provider.GetRequiredService<ClientFactory>(),
-            provider.GetOptions<ConsumerOptions>(name),
-            hf(provider)
-        ));
+            return new Consumer(name,
+                provider.GetLoggerFor<Consumer>(),
+                clientFactory,
+                hf(provider)
+            );
+        });
 
         if (!added)
             throw new ArgumentException("Consumer is already registered", nameof(name));
 
         services.AddHostedService(provider => provider.GetRequiredKeyedService<Consumer>(name));
 
-        return OptionsFor(name).Configure<IOptions<ClientConfig>>((co, defaults) => co.EnrichFrom(defaults.Value));
+        return OptionsFor(name).Configure<IOptions<ClientConfig>>((co, defaults) =>
+        {
+            co.EnrichFrom(defaults.Value);
+            if (!string.IsNullOrEmpty(name))
+                co.ClientConfig.GroupId = name;
+        });
     }
 
     public OptionsBuilder<ConsumerOptions> OptionsFor(string name) => services.AddOptions<ConsumerOptions>(name);

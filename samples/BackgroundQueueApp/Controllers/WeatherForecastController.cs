@@ -5,19 +5,12 @@ namespace BackgroundQueueApp.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class WeatherForecastController : ControllerBase
+public class WeatherForecastController(IBackgroundQueue<WeatherForecast> queue) : ControllerBase
 {
     private static readonly string[] Summaries =
-    {
+    [
         "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-    };
-
-    private readonly IBackgroundQueue<WeatherForecast> _queue;
-
-    public WeatherForecastController(IBackgroundQueue<WeatherForecast> queue)
-    {
-        _queue = queue;
-    }
+    ];
 
     [HttpGet(Name = "GetWeatherForecast")]
     public async ValueTask<IEnumerable<WeatherForecast>> Get()
@@ -29,7 +22,7 @@ public class WeatherForecastController : ControllerBase
                 Summary = Summaries[Random.Shared.Next(Summaries.Length)]
             }).ToArray();
 
-        await _queue.Enqueue(forecasts[0]);
+        await queue.Enqueue(forecasts[0]);
 
         return forecasts;
     }

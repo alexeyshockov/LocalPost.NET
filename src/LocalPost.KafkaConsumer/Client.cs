@@ -1,12 +1,45 @@
+using System.Collections;
 using Confluent.Kafka;
 
 namespace LocalPost.KafkaConsumer;
 
+internal sealed class ClientFactory(ILogger logger, ConsumerOptions settings)
+{
+    public async Task<Clients> Create(CancellationToken ct)
+    {
+        return new Clients(await Task.WhenAll(Enumerable
+            .Range(0, settings.Consumers)
+            .Select(_ => Task.Run(CreateClient, ct))
+        ).ConfigureAwait(false));
+
+        Client CreateClient()
+        {
+            var consumer = new ConsumerBuilder<Ignore, byte[]>(settings.ClientConfig)
+                .SetErrorHandler((_, e) => logger.LogError("{Error}", e))
+                .SetLogHandler((_, m) => logger.LogDebug(m.Message))
+                .Build();
+            consumer.Subscribe(settings.Topics);
+            return new Client(logger, consumer, settings.ClientConfig);
+        }
+    }
+}
+
+internal sealed class Clients(Client[] clients) : IReadOnlyCollection<Client>
+{
+    public Task Close(CancellationToken ct) => Task.WhenAll(clients.Select(client => Task.Run(client.Close, ct)));
+
+    public IEnumerator<Client> GetEnumerator() => ((IEnumerable<Client>)clients).GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => clients.GetEnumerator();
+
+    public int Count => clients.Length;
+}
+
 internal sealed class Client
 {
-    private readonly ILogger<Client> _logger;
+    private readonly ILogger _logger;
 
-    public Client(ILogger<Client> logger, IConsumer<Ignore, byte[]> consumer, ConsumerConfig config)
+    public Client(ILogger logger, IConsumer<Ignore, byte[]> consumer, ConsumerConfig config)
     {
         _logger = logger;
         Consumer = consumer;
@@ -46,49 +79,20 @@ internal sealed class Client
         }
     }
 
+    public void Close()
+    {
+        try
+        {
+            Consumer.Close();
+        }
+        finally
+        {
+            Consumer.Dispose();
+        }
+    }
+
     public IConsumer<Ignore, byte[]> Consumer { get; }
     public ConsumerConfig Config { get; }
     public string ServerAddress { get; }
     public int ServerPort { get; } = 9092;
-}
-
-internal sealed class ClientFactory(ILogger<ClientFactory> logger, ILogger<Client> clientLogger) : IDisposable
-{
-    private List<Client> _clients = [];
-
-    public Client Create(ConsumerConfig config, IEnumerable<string> topics)
-    {
-        var consumer = new ConsumerBuilder<Ignore, byte[]>(config)
-            .SetErrorHandler((_, e) => clientLogger.LogError("{Error}", e))
-            .SetLogHandler((_, m) => clientLogger.LogDebug(m.Message))
-            .Build();
-        consumer.Subscribe(topics);
-        var client = new Client(clientLogger, consumer, config);
-        _clients.Add(client);
-        return client;
-    }
-
-    private void Close(IConsumer<Ignore, byte[]> consumer)
-    {
-        try
-        {
-            consumer.Close();
-        }
-        catch (Exception e)
-        {
-            logger.LogError(e, "Error closing Kafka consumer");
-        }
-        finally
-        {
-            consumer.Dispose();
-        }
-    }
-
-    public void Dispose()
-    {
-        // TODO Run in parallel?..
-        foreach (var client in _clients)
-            Close(client.Consumer);
-        _clients = [];
-    }
 }

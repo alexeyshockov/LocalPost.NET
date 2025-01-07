@@ -42,7 +42,7 @@ public static class HandlerStackOps
         {
             try
             {
-                await next(context, ct);
+                await next(context, ct).ConfigureAwait(false);
             }
             finally
             {
@@ -55,11 +55,11 @@ public static class HandlerStackOps
         {
             try
             {
-                await next(context, ct);
+                await next(context, ct).ConfigureAwait(false);
             }
             finally
             {
-                await context.DisposeAsync();
+                await context.DisposeAsync().ConfigureAwait(false);
             }
         });
 
@@ -69,6 +69,6 @@ public static class HandlerStackOps
             if (pred(context))
                 return;
 
-            await next(context, ct);
+            await next(context, ct).ConfigureAwait(false);
         });
 }

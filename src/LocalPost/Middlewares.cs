@@ -3,7 +3,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace LocalPost;
 
-public static partial class HandlerStackEx
+public static partial class Middlewares
 {
     /// <summary>
     ///     Handle exceptions and log them, to not break the consumer loop.
@@ -20,7 +20,7 @@ public static partial class HandlerStackEx
         {
             try
             {
-                await next(context, ct);
+                await next(context, ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException e) when (e.CancellationToken == ct)
             {
@@ -58,7 +58,7 @@ public static partial class HandlerStackEx
         {
             try
             {
-                await next(context, ct);
+                await next(context, ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException e) when (e.CancellationToken == ct)
             {

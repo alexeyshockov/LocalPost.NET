@@ -3,7 +3,6 @@ using Confluent.Kafka;
 using LocalPost.KafkaConsumer.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Xunit.Abstractions;
 
 namespace LocalPost.KafkaConsumer.Tests;
 
@@ -64,18 +63,14 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
                 .Scoped()
                 .Trace()
             )
-            .ConfigureConsumer(consumer =>
+            .Configure(co =>
             {
-                consumer.BootstrapServers = _container.GetBootstrapAddress();
+                co.ClientConfig.BootstrapServers = _container.GetBootstrapAddress();
                 // This is the default value, from the name parameter above
-                // consumer.GroupId = "test-consumer";
-                consumer.Topic = Topic;
+                // co.ClientConfig.GroupId = "test-consumer";
+                co.Topics.Add(Topic);
                 // Otherwise the client attaches to the end of the topic, skipping all the published messages
-                consumer.AutoOffsetReset = AutoOffsetReset.Earliest;
-            })
-            .Configure(pipeline =>
-            {
-                pipeline.MaxConcurrency = 2;
+                co.ClientConfig.AutoOffsetReset = AutoOffsetReset.Earliest;
             })
             .ValidateDataAnnotations());
 

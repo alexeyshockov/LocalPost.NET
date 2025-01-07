@@ -5,8 +5,9 @@ namespace LocalPost.BackgroundQueue;
 [PublicAPI]
 public static class HandlerStackEx
 {
-    public static HandlerFactory<ConsumeContext<T>> UsePayload<T>(this HandlerFactory<T> hf) =>
-        hf.Map<ConsumeContext<T>, T>(next => async (context, ct) => await next(context.Payload, ct));
+    public static HandlerFactory<ConsumeContext<T>> UseMessagePayload<T>(this HandlerFactory<T> hf) =>
+        hf.Map<ConsumeContext<T>, T>(next => async (context, ct) =>
+            await next(context.Payload, ct).ConfigureAwait(false));
 
     public static HandlerFactory<ConsumeContext<T>> Trace<T>(this HandlerFactory<ConsumeContext<T>> hf)
     {
@@ -20,7 +21,7 @@ public static class HandlerStackEx
                 : Tracing.Source.StartActivity(transactionName, ActivityKind.Consumer);
             try
             {
-                await next(context, ct);
+                await next(context, ct).ConfigureAwait(false);
                 activity?.Success();
             }
             catch (Exception e)

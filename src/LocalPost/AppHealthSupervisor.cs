@@ -20,7 +20,7 @@ internal sealed class AppHealthSupervisor(ILogger<AppHealthSupervisor> logger,
     {
         while (!ct.IsCancellationRequested)
         {
-            var result = await Check(ct);
+            var result = await Check(ct).ConfigureAwait(false);
             if (result.Status == HealthStatus.Unhealthy)
             {
                 logger.LogError("Health check failed, stopping the application...");
@@ -29,7 +29,7 @@ internal sealed class AppHealthSupervisor(ILogger<AppHealthSupervisor> logger,
                 break;
             }
 
-            await Task.Delay(CheckInterval, ct);
+            await Task.Delay(CheckInterval, ct).ConfigureAwait(false);
         }
     }
 }

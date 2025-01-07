@@ -10,10 +10,12 @@ public sealed record QueueOptions<T>
     /// </summary>
     [Required]
     [Range(1, ushort.MaxValue)]
-    public ushort MaxConcurrency { get; set; } = 50;
+    public ushort MaxConcurrency { get; set; } = 10;
+
+    public bool ProcessLeftovers { get; set; } = true;
 
     [Range(1, int.MaxValue)]
-    public int? BufferSize { get; set; } = 1000;
+    public int? Capacity { get; set; } = 1000;
 
     /// <summary>
     ///     How to handle new messages when the underlying channel is full. Default is to drop the oldest message

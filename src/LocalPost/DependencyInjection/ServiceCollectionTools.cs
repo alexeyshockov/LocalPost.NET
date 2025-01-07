@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace LocalPost.DependencyInjection;
 
@@ -36,11 +37,9 @@ internal static class ServiceCollectionTools
 
         static bool IsEqual(ServiceDescriptor a, ServiceDescriptor b)
         {
-            var equal = a.ServiceType == b.ServiceType; // && a.Lifetime == b.Lifetime;
-            if (equal && a is { IsKeyedService: true } && b is { IsKeyedService: true })
-                return a.ServiceKey == b.ServiceKey;
+            var equal = a.ServiceType == b.ServiceType && a.IsKeyedService == b.IsKeyedService;
 
-            return equal;
+            return equal && a.IsKeyedService ? a.ServiceKey == b.ServiceKey : equal;
         }
     }
 
@@ -61,6 +60,13 @@ internal static class ServiceCollectionTools
 
     public static bool TryAddSingletonAlias<TAlias, TService>(this IServiceCollection services, object key)
         where TAlias : class
-        where TService : class, TAlias =>
-        services.TryAddKeyedSingleton<TAlias>(key, (provider, _) => provider.GetRequiredKeyedService<TService>(key));
+        where TService : class, TAlias
+    {
+        var added = services.TryAddKeyedSingleton<TAlias>(key, (provider, _) =>
+            provider.GetRequiredKeyedService<TService>(key));
+        if (added && key is string name && name == Options.DefaultName)
+            services.TryAddSingleton<TAlias>(provider =>
+                provider.GetRequiredKeyedService<TService>(Options.DefaultName));
+        return added;
+    }
 }

@@ -27,10 +27,11 @@ builder.Services.AddBackgroundQueues(bq =>
             await Task.Delay(TimeSpan.FromSeconds(2), ct);
             Console.WriteLine(weather.Summary);
         })
+        .UseMessagePayload()
         .Scoped()
-        .UsePayload()
         .Trace()
         .UsePollyPipeline(resiliencePipeline)
+        .LogExceptions()
     )
 );
 

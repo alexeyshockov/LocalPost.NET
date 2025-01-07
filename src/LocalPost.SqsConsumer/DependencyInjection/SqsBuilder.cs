@@ -1,5 +1,6 @@
 using Amazon.SQS;
 using LocalPost.DependencyInjection;
+using LocalPost.Flow;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -13,14 +14,28 @@ public sealed class SqsBuilder(IServiceCollection services)
     /// <summary>
     ///     Add an SQS consumer with a custom message handler.
     /// </summary>
+    /// <param name="hf">Message handler factory.</param>
+    /// <returns>Consumer options builder.</returns>
+    public OptionsBuilder<ConsumerOptions> AddConsumer(HandlerFactory<ConsumeContext<string>> hf) =>
+        AddConsumer(Options.DefaultName, hf);
+
+    /// <summary>
+    ///     Add an SQS consumer with a custom message handler.
+    /// </summary>
     /// <param name="name">Consumer name (should be unique in the application). Also, the default queue name.</param>
     /// <param name="hf">Message handler factory.</param>
     /// <returns>Consumer options builder.</returns>
-    public OptionsBuilder<ConsumerOptions> AddConsumer(string name, HandlerFactory<ConsumeContext<string>> hf)
-    {
-        if (string.IsNullOrEmpty(name)) // TODO Just default (empty?) name...
-            throw new ArgumentException("A proper (non empty) name is required", nameof(name));
+    public OptionsBuilder<ConsumerOptions> AddConsumer(string name, HandlerFactory<ConsumeContext<string>> hf) =>
+        AddConsumer(name, hf.SelectMessageEvent());
 
+    /// <summary>
+    ///     Add an SQS consumer with a custom message handler.
+    /// </summary>
+    /// <param name="name">Consumer name (should be unique in the application). Also, the default queue name.</param>
+    /// <param name="hf">Message handler factory.</param>
+    /// <returns>Consumer options builder.</returns>
+    public OptionsBuilder<ConsumerOptions> AddConsumer(string name, HandlerFactory<Event<ConsumeContext<string>>> hf)
+    {
         var added = services.TryAddKeyedSingleton(name, (provider, _) => new Consumer(name,
             provider.GetLoggerFor<Consumer>(),
             provider.GetRequiredService<IAmazonSQS>(),

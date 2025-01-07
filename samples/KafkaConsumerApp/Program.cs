@@ -1,4 +1,5 @@
 using Confluent.Kafka;
+using JetBrains.Annotations;
 using LocalPost;
 using LocalPost.KafkaConsumer;
 using LocalPost.KafkaConsumer.DependencyInjection;
@@ -12,29 +13,29 @@ builder.Services
         kafka.Defaults
             .Bind(builder.Configuration.GetSection("Kafka"))
             .ValidateDataAnnotations();
-        kafka.AddConsumer("example-consumer-group", HandlerStack.From<MessageHandler, WeatherForecast>()
-                .UseKafkaPayload()
-                .DeserializeJson()
-                .Acknowledge()
-                .Scoped()
-                .Trace()
+        kafka.AddConsumer("example-consumer-group",
+                HandlerStack.From<MessageHandler, WeatherForecast>()
+                    .UseKafkaPayload()
+                    .Scoped()
+                    .DeserializeJson()
+                    .Trace()
+                    .Acknowledge()
+                    .LogExceptions()
             )
             .Bind(builder.Configuration.GetSection("Kafka:Consumer"))
-            .ConfigureConsumer(options =>
+            .Configure(options =>
             {
-                options.AutoOffsetReset = AutoOffsetReset.Earliest;
-                // options.EnableAutoCommit = false; // TODO DryRun
+                options.ClientConfig.AutoOffsetReset = AutoOffsetReset.Earliest;
+                // options.ClientConfig.EnableAutoCommit = false; // DryRun
             })
             .ValidateDataAnnotations();
     });
 
-// TODO Health + Supervisor
-var host = builder.Build();
-
-await host.RunAsync();
+await builder.Build().RunAsync();
 
 
 
+[UsedImplicitly]
 public record WeatherForecast(int TemperatureC, int TemperatureF, string Summary);
 
 internal sealed class MessageHandler : IHandler<WeatherForecast>
