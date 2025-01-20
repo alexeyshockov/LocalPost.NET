@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -5,6 +6,15 @@ namespace LocalPost;
 
 public static partial class Middlewares
 {
+    public static HandlerFactory<byte[]> DecodeString(this HandlerFactory<string> hf) =>
+        DecodeString(hf, Encoding.UTF8);
+
+    public static HandlerFactory<byte[]> DecodeString(this HandlerFactory<string> hf, Encoding encoding) => hf.Map<byte[], string>(next => async (payload, ct) =>
+    {
+        var s = encoding.GetString(payload);
+        await next(s, ct).ConfigureAwait(false);
+    });
+
     /// <summary>
     ///     Handle exceptions and log them, to not break the consumer loop.
     /// </summary>
@@ -82,7 +92,6 @@ internal sealed class ScopedHandler<T>(IServiceScopeFactory sf, HandlerFactory<T
         await using var scope = sf.CreateAsyncScope();
 
         var handler = hf(scope.ServiceProvider);
-
-        await handler(payload, ct);
+        await handler(payload, ct).ConfigureAwait(false);
     }
 }

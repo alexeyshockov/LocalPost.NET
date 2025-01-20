@@ -22,14 +22,6 @@ public sealed class KafkaBuilder(IServiceCollection services)
     /// <summary>
     ///     Add a Kafka consumer with a custom message handler.
     /// </summary>
-    /// <param name="hf">Message handler factory.</param>
-    /// <returns>Consumer options builder.</returns>
-    public OptionsBuilder<ConsumerOptions> AddConsumer(HandlerFactory<Event<ConsumeContext<byte[]>>> hf) =>
-        AddConsumer(Options.DefaultName, hf);
-
-    /// <summary>
-    ///     Add a Kafka consumer with a custom message handler.
-    /// </summary>
     /// <param name="name">Consumer name (should be unique in the application). Also, the default group ID.</param>
     /// <param name="hf">Message handler factory.</param>
     /// <returns>Consumer options builder.</returns>

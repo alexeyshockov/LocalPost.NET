@@ -48,25 +48,18 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
 
         var hostBuilder = Host.CreateApplicationBuilder();
         hostBuilder.Services.AddKafkaConsumers(kafka => kafka
-            .AddConsumer("test-consumer", HandlerStack.For<string>((payload, _) =>
-                {
-                    received.Add(payload);
-                    return default;
-                })
-                .Map<byte[], string>(next => async (payload, ct) =>
-                {
-                    // TODO Support string payload out of the box?..
-                    await next(Encoding.UTF8.GetString(payload), ct);
-                })
-                .UseKafkaPayload()
-                .Acknowledge()
-                .Scoped()
-                .Trace()
+            .AddConsumer("test-consumer",
+                HandlerStack.For<string>(payload => received.Add(payload))
+                    .Scoped()
+                    .DecodeString()
+                    .UseKafkaPayload()
+                    .Acknowledge()
+                    .Trace()
             )
             .Configure(co =>
             {
                 co.ClientConfig.BootstrapServers = _container.GetBootstrapAddress();
-                // This is the default value, from the name parameter above
+                // Already set, see above
                 // co.ClientConfig.GroupId = "test-consumer";
                 co.Topics.Add(Topic);
                 // Otherwise the client attaches to the end of the topic, skipping all the published messages
