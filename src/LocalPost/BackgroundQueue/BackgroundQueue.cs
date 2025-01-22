@@ -31,12 +31,12 @@ internal sealed class BackgroundQueue<T>(ILogger<BackgroundQueue<T>> logger, Que
         }
         finally
         {
-            await runner.Stop(forceShutdownToken).ConfigureAwait(false);
+            await runner.Stop(null, forceShutdownToken).ConfigureAwait(false);
         }
     }
 
     public void Dispose()
     {
-        runner?.Dispose();
+        runner.Dispose();
     }
 }

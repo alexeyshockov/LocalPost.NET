@@ -7,7 +7,7 @@ using Microsoft.Extensions.Hosting;
 namespace LocalPost.KafkaConsumer;
 
 internal sealed class Consumer(string name, ILogger logger,
-    ClientFactory clientFactory, Handler<Event<ConsumeContext<byte[]>>> handler)
+    ClientFactory clientFactory, IHandlerManager<ConsumeContext<byte[]>> handler)
     : IHostedService, IHealthAwareService, IDisposable
 {
     private Clients _clients = new([]);
@@ -39,7 +39,7 @@ internal sealed class Consumer(string name, ILogger logger,
             while (!execToken.IsCancellationRequested)
             {
                 var result = client.Consume(execToken);
-                await handler(new ConsumeContext<byte[]>(client, result, result.Message.Value), CancellationToken.None)
+                await handler.Handle(new ConsumeContext<byte[]>(client, result, result.Message.Value), CancellationToken.None)
                     .ConfigureAwait(false);
             }
         }
@@ -76,7 +76,7 @@ internal sealed class Consumer(string name, ILogger logger,
         logger.LogInformation("Kafka consumer started");
 
         logger.LogDebug("Invoking the event handler...");
-        await handler(Event<ConsumeContext<byte[]>>.Begin, ct).ConfigureAwait(false);
+        await handler.Start(ct).ConfigureAwait(false);
         logger.LogDebug("Event handler started");
 
         _exec = ObserveExecution();
@@ -91,8 +91,7 @@ internal sealed class Consumer(string name, ILogger logger,
                 ).ToArray();
                 await (executions.Length == 1 ? executions[0] : Task.WhenAll(executions)).ConfigureAwait(false);
 
-                // TODO Pass the exception (if any) to the handler
-                await handler(Event<ConsumeContext<byte[]>>.End, _completionToken).ConfigureAwait(false);
+                await handler.Stop(_execException, _completionToken).ConfigureAwait(false);
             }
             finally
             {

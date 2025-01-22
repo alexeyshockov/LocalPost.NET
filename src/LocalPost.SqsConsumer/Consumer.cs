@@ -8,7 +8,7 @@ using Microsoft.Extensions.Hosting;
 namespace LocalPost.SqsConsumer;
 
 internal sealed class Consumer(string name, ILogger<Consumer> logger, IAmazonSQS sqs,
-    ConsumerOptions settings, Handler<Event<ConsumeContext<string>>> handler)
+    ConsumerOptions settings, IHandlerManager<ConsumeContext<string>> handler)
     : IHostedService, IHealthAwareService, IDisposable
 {
     private CancellationTokenSource? _execTokenSource;
@@ -40,7 +40,7 @@ internal sealed class Consumer(string name, ILogger<Consumer> logger, IAmazonSQS
                 var messages = await client.PullMessages(execToken).ConfigureAwait(false);
                 await Task.WhenAll(messages
                     .Select(message => new ConsumeContext<string>(client, message, message.Body))
-                    .Select(context => handler(context, CancellationToken.None).AsTask()))
+                    .Select(context => handler.Handle(context, CancellationToken.None).AsTask()))
                     .ConfigureAwait(false);
             }
         }
@@ -74,7 +74,7 @@ internal sealed class Consumer(string name, ILogger<Consumer> logger, IAmazonSQS
         var client = new QueueClient(logger, sqs, settings);
         await client.Connect(ct).ConfigureAwait(false);
 
-        await handler(Event<ConsumeContext<string>>.Begin, ct).ConfigureAwait(false);
+        await handler.Start(ct).ConfigureAwait(false);
 
         _exec = ObserveExecution();
         return;
@@ -92,8 +92,7 @@ internal sealed class Consumer(string name, ILogger<Consumer> logger, IAmazonSQS
                 };
                 await execution.ConfigureAwait(false);
 
-                // TODO Pass the exception (if any) to the handler
-                await handler(Event<ConsumeContext<string>>.End, _completionToken).ConfigureAwait(false);
+                await handler.Stop(_execException, _completionToken).ConfigureAwait(false);
             }
             finally
             {

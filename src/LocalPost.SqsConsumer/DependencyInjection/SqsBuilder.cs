@@ -26,7 +26,7 @@ public sealed class SqsBuilder(IServiceCollection services)
     /// <param name="hf">Message handler factory.</param>
     /// <returns>Consumer options builder.</returns>
     public OptionsBuilder<ConsumerOptions> AddConsumer(string name, HandlerFactory<ConsumeContext<string>> hf) =>
-        AddConsumer(name, hf.SelectMessageEvent());
+        AddConsumer(name, hf.AsHandlerManager());
 
     /// <summary>
     ///     Add an SQS consumer with a custom message handler.
@@ -34,7 +34,7 @@ public sealed class SqsBuilder(IServiceCollection services)
     /// <param name="name">Consumer name (should be unique in the application). Also, the default queue name.</param>
     /// <param name="hf">Message handler factory.</param>
     /// <returns>Consumer options builder.</returns>
-    public OptionsBuilder<ConsumerOptions> AddConsumer(string name, HandlerFactory<Event<ConsumeContext<string>>> hf)
+    public OptionsBuilder<ConsumerOptions> AddConsumer(string name, HandlerManagerFactory<ConsumeContext<string>> hf)
     {
         var added = services.TryAddKeyedSingleton(name, (provider, _) => new Consumer(name,
             provider.GetLoggerFor<Consumer>(),

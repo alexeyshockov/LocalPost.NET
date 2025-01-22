@@ -30,9 +30,9 @@ public class BackgroundQueuesBuilder(IServiceCollection services)
         AddQueue(Options.DefaultName, hf);
 
     public OptionsBuilder<QueueOptions<T>> AddQueue<T>(string name, HandlerFactory<ConsumeContext<T>> hf) =>
-        AddQueue<T>(name, hf.SelectMessageEvent());
+        AddQueue<T>(name, hf.AsHandlerManager());
 
-    public OptionsBuilder<QueueOptions<T>> AddQueue<T>(string name, HandlerFactory<Event<ConsumeContext<T>>> hf)
+    public OptionsBuilder<QueueOptions<T>> AddQueue<T>(string name, HandlerManagerFactory<ConsumeContext<T>> hmf)
     {
         if (!services.TryAddSingletonAlias<IBackgroundQueue<T>, BackgroundQueue<T>>(name))
             // throw new InvalidOperationException(
@@ -61,8 +61,8 @@ public class BackgroundQueuesBuilder(IServiceCollection services)
                     SingleWriter = settings.SingleProducer,
                 })
             };
-            var handler = hf(provider);
-            var runner = ChannelRunner.Create(channel, handler, settings.MaxConcurrency, settings.ProcessLeftovers);
+            var hm = hmf(provider);
+            var runner = ChannelRunner.Create(channel, hm, settings.MaxConcurrency, settings.ProcessLeftovers);
 
             return new BackgroundQueue<T>(provider.GetLoggerFor<BackgroundQueue<T>>(), settings, channel, runner);
         }

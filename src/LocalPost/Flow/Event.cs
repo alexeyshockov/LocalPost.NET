@@ -1,7 +1,6 @@
 namespace LocalPost.Flow;
 
-
-
+public delegate IHandlerManager<T> HandlerManagerFactory<in T>(IServiceProvider provider);
 
 public interface IHandlerManager<in T>
 {
@@ -12,7 +11,7 @@ public interface IHandlerManager<in T>
     ValueTask Stop(Exception? error, CancellationToken ct);
 }
 
-internal class HandlerManager<T>(Handler<T> handler) : IHandlerManager<T>
+internal sealed class HandlerManager<T>(Handler<T> handler) : IHandlerManager<T>
 {
     public ValueTask Start(CancellationToken ct) => ValueTask.CompletedTask;
 
@@ -20,7 +19,6 @@ internal class HandlerManager<T>(Handler<T> handler) : IHandlerManager<T>
 
     public ValueTask Stop(Exception? error, CancellationToken ct) => ValueTask.CompletedTask;
 }
-
 
 // public enum EventType : byte
 // {

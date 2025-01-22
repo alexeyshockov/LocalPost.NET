@@ -7,22 +7,28 @@ namespace LocalPost.Flow;
 [PublicAPI]
 public static partial class HandlerStackEx
 {
-    /// <summary>
-    ///     Gateway from T to Event{T}.
-    /// </summary>
-    /// <param name="hf">Message handler factory.</param>
-    /// <typeparam name="T">Message payload type.</typeparam>
-    /// <returns>Wrapped handler factory.</returns>
-    public static HandlerFactory<Event<T>> SelectMessageEvent<T>(this HandlerFactory<T> hf) => hf.Map<Event<T>, T>(
-        next => (flowEvent, ct) => flowEvent.Type switch
-        {
-            EventType.Message => next(flowEvent.Payload!, ct),
-            _ => ValueTask.CompletedTask,
-        });
+    // Keep it internal for now, until it's clear that this generic transformation is useful
+    internal static HandlerManagerFactory<T> AsHandlerManager<T>(this HandlerFactory<T> hf) => provider =>
+    {
+        var handler = hf(provider);
+        return new HandlerManager<T>(handler);
+    };
 
-    public static HandlerFactory<Event<T>> Buffer<T>(this HandlerFactory<Event<T>> hf,
-        int capacity,
-        int consumers = 1, bool singleProducer = false)
+    public static HandlerManagerFactory<T> Buffer<T>(this HandlerFactory<T> hf,
+        int capacity, int consumers = 1, bool singleProducer = false) =>
+        hf.AsHandlerManager().Buffer(capacity, consumers, singleProducer);
+
+    public static HandlerManagerFactory<T> Batch<T>(this HandlerFactory<ImmutableArray<T>> hf,
+        int size, TimeSpan window,
+        int capacity = 1, int consumers = 1, bool singleProducer = false) =>
+        hf.AsHandlerManager().Batch(size, window, capacity, consumers, singleProducer);
+}
+
+[PublicAPI]
+public static partial class HandlerManagerStackEx
+{
+    public static HandlerManagerFactory<T> Buffer<T>(this HandlerManagerFactory<T> hmf,
+        int capacity, int consumers = 1, bool singleProducer = false)
     {
         var channel = Channel.CreateBounded<T>(new BoundedChannelOptions(capacity)
         {
@@ -31,33 +37,48 @@ public static partial class HandlerStackEx
             SingleWriter = singleProducer,
         });
 
-        return hf.Buffer(channel, consumers);
+        return hmf.Buffer(channel, consumers);
     }
 
-    private static HandlerFactory<Event<T>> Buffer<T>(this HandlerFactory<Event<T>> hf, Channel<T> channel,
-        int consumers = 1) => provider =>
+    private static HandlerManagerFactory<T> Buffer<T>(this HandlerManagerFactory<T> hmf,
+        Channel<T> channel, int consumers = 1) => provider =>
     {
-        var handler = hf(provider);
-        var buffer = new ChannelRunner<T, T>(channel, Consume, handler) { Consumers = consumers };
-
-        return (flowEvent, ct) => flowEvent.Type switch
-        {
-            EventType.Begin => buffer.Start(ct),
-            EventType.Message => channel.Writer.WriteAsync(flowEvent.Payload, ct),
-            EventType.End => buffer.Stop(ct),
-            _ => ValueTask.CompletedTask,
-        };
+        var next = hmf(provider);
+        var buffer = new ChannelRunner<T, T>(channel, Consume, next) { Consumers = consumers };
+        return new BufferHandlerManager<T>(channel, buffer);
 
         async Task Consume(CancellationToken execToken)
         {
             await foreach (var message in channel.Reader.ReadAllAsync(execToken).ConfigureAwait(false))
-                await handler(message, CancellationToken.None).ConfigureAwait(false);
-        }
+                await next.Handle(message, CancellationToken.None).ConfigureAwait(false);
+        };
     };
 
-    public static HandlerFactory<Event<T>> Batch<T>(this HandlerFactory<Event<ImmutableArray<T>>> hf,
+    public static HandlerManagerFactory<T> Batch<T>(this HandlerManagerFactory<ImmutableArray<T>> hmf,
         int size, TimeSpan window,
         int capacity = 1, int consumers = 1, bool singleProducer = false) => provider =>
+    {
+        var next = hmf(provider);
+        return BatchHandlerManager<T>.Create(next, size, window, capacity, consumers, singleProducer);
+    };
+}
+
+internal sealed class BufferHandlerManager<T>(Channel<T> channel,
+    ChannelRunner<T, T> runner) : IHandlerManager<T>
+{
+    public ValueTask Start(CancellationToken ct) => runner.Start(ct);
+
+    public ValueTask Handle(T payload, CancellationToken ct) => channel.Writer.WriteAsync(payload, ct);
+
+    public ValueTask Stop(Exception? error, CancellationToken ct) => runner.Stop(error, ct);
+}
+
+internal sealed class BatchHandlerManager<T>(Channel<T> channel,
+    ChannelRunner<T, ImmutableArray<T>> runner) : IHandlerManager<T>
+{
+    public static BatchHandlerManager<T> Create(IHandlerManager<ImmutableArray<T>> next,
+        int size, TimeSpan window,
+        int capacity = 1, int consumers = 1, bool singleProducer = false)
     {
         var channel = Channel.CreateBounded<T>(new BoundedChannelOptions(capacity)
         {
@@ -65,16 +86,10 @@ public static partial class HandlerStackEx
             SingleReader = consumers == 1,
             SingleWriter = singleProducer,
         });
-        var handler = hf(provider);
-        var buffer = new ChannelRunner<T, ImmutableArray<T>>(channel, Consume, handler) { Consumers = consumers };
-
-        return (flowEvent, ct) => flowEvent.Type switch
-        {
-            EventType.Begin => buffer.Start(ct),
-            EventType.Message => channel.Writer.WriteAsync(flowEvent.Payload, ct),
-            EventType.End => buffer.Stop(ct),
-            _ => ValueTask.CompletedTask,
-        };
+        // var handler = hf(provider);
+        var buffer = new ChannelRunner<T, ImmutableArray<T>>(channel, Consume, next) { Consumers = consumers };
+        var hm = new BatchHandlerManager<T>(channel, buffer);
+        return hm;
 
         async Task Consume(CancellationToken execToken)
         {
@@ -111,15 +126,22 @@ public static partial class HandlerStackEx
                 // Otherwise, the contents will be copied into a new array. The internal buffer will then be set to a
                 // zero length array.
                 var batch = batchBuilder.DrainToImmutable();
-                await handler(batch, CancellationToken.None).ConfigureAwait(false);
+                await next.Handle(batch, CancellationToken.None).ConfigureAwait(false);
             }
-        }
-    };
+        };
+    }
+
+    public ValueTask Start(CancellationToken ct) => runner.Start(ct);
+
+    public ValueTask Handle(T payload, CancellationToken ct) => channel.Writer.WriteAsync(payload, ct);
+
+    public ValueTask Stop(Exception? error, CancellationToken ct) => runner.Stop(error, ct);
 }
 
 internal static class ChannelRunner
 {
-    public static ChannelRunner<T, T> Create<T>(Channel<T> channel, Handler<Event<T>> handler,
+    // public static ChannelRunner<T, T> Create<T>(Channel<T> channel, Handler<Event<T>> handler,
+    public static ChannelRunner<T, T> Create<T>(Channel<T> channel, IHandlerManager<T> handler,
         int consumers = 1, bool processLeftovers = true)
     {
         return new ChannelRunner<T, T>(channel, Consume, handler)
@@ -128,13 +150,14 @@ internal static class ChannelRunner
         async Task Consume(CancellationToken execToken)
         {
             await foreach (var message in channel.Reader.ReadAllAsync(execToken).ConfigureAwait(false))
-                await handler(message, CancellationToken.None).ConfigureAwait(false);
+                await handler.Handle(message, CancellationToken.None).ConfigureAwait(false);
         }
     }
 }
 
 internal sealed class ChannelRunner<T, TOut>(Channel<T> channel,
-    Func<CancellationToken, Task> consumer, Handler<Event<TOut>> handler) : IDisposable
+    // Func<CancellationToken, Task> consumer, Handler<Event<TOut>> handler) : IDisposable
+    Func<CancellationToken, Task> consumer, IHandlerManager<TOut> handler) : IDisposable
 {
     public HealthCheckResult Ready => (_execTokenSource, _exec, _execException) switch
     {
@@ -161,7 +184,8 @@ internal sealed class ChannelRunner<T, TOut>(Channel<T> channel,
 
         var execTokenSource = _execTokenSource = new CancellationTokenSource();
 
-        await handler(Event<TOut>.Begin, ct).ConfigureAwait(false);
+        // await handler(Event<TOut>.Begin, ct).ConfigureAwait(false);
+        await handler.Start(ct).ConfigureAwait(false);
 
         _exec = Run(execTokenSource.Token);
     }
@@ -175,7 +199,8 @@ internal sealed class ChannelRunner<T, TOut>(Channel<T> channel,
         };
         await exec.ConfigureAwait(false);
 
-        await handler(Event<TOut>.End, _completionToken).ConfigureAwait(false);
+        // await handler(Event<TOut>.End, _completionToken).ConfigureAwait(false);
+        await handler.Stop(_execException, _completionToken).ConfigureAwait(false);
     }
 
     private async Task RunConsumer(CancellationToken execToken)
@@ -183,6 +208,7 @@ internal sealed class ChannelRunner<T, TOut>(Channel<T> channel,
         try
         {
             await consumer(execToken).ConfigureAwait(false);
+            Close();
         }
         catch (OperationCanceledException e) when (e.CancellationToken == execToken)
         {
@@ -198,10 +224,10 @@ internal sealed class ChannelRunner<T, TOut>(Channel<T> channel,
         }
     }
 
-    public async ValueTask Stop(CancellationToken ct)
+    public async ValueTask Stop(Exception? e, CancellationToken ct)
     {
         _completionToken = ct;
-        Close();
+        Close(e);
         if (_exec is not null)
             await _exec.ConfigureAwait(false);
     }
@@ -214,7 +240,8 @@ internal sealed class ChannelRunner<T, TOut>(Channel<T> channel,
 
     private void Close(Exception? e = null)
     {
-        channel.Writer.TryComplete(e);
+        if (!channel.Writer.TryComplete(e))
+            return;
         _execException ??= e;
         if (!ProcessLeftovers)
             _execTokenSource?.Cancel();
