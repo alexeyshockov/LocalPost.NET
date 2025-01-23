@@ -27,6 +27,14 @@ public static class HandlerStackEx
                 }
             });
 
+    /// <summary>
+    ///     Manually acknowledge every message (store offset).
+    ///
+    ///     Works only when EnableAutoOffsetStore is false!
+    /// </summary>
+    /// <param name="hf">Message handler factory.</param>
+    /// <typeparam name="T">Message type.</typeparam>
+    /// <returns>Wrapped handler factory.</returns>
     public static HandlerFactory<ConsumeContext<T>> Acknowledge<T>(this HandlerFactory<ConsumeContext<T>> hf) =>
         hf.Map<ConsumeContext<T>, ConsumeContext<T>>(next =>
             async (context, ct) =>

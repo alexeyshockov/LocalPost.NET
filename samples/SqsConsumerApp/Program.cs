@@ -13,7 +13,11 @@ builder.Services
     .AddDefaultAWSOptions(builder.Configuration.GetAWSOptions())
     .AddAWSService<IAmazonSQS>();
 
-
+builder.Services.Configure<HostOptions>(options =>
+{
+    options.ServicesStartConcurrently = true;
+    options.ServicesStopConcurrently = true;
+});
 
 builder.Services
     .AddScoped<MessageHandler>()
@@ -34,7 +38,6 @@ builder.Services
 
 // TODO Health + Supervisor
 await builder.Build().RunAsync();
-
 
 
 [UsedImplicitly]

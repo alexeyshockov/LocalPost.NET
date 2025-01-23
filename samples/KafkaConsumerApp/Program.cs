@@ -6,6 +6,12 @@ using LocalPost.KafkaConsumer.DependencyInjection;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+builder.Services.Configure<HostOptions>(options =>
+{
+    options.ServicesStartConcurrently = true;
+    options.ServicesStopConcurrently = true;
+});
+
 builder.Services
     .AddScoped<MessageHandler>()
     .AddKafkaConsumers(kafka =>
@@ -19,7 +25,7 @@ builder.Services
                     .Scoped()
                     .DeserializeJson()
                     .Trace()
-                    .Acknowledge()
+                    // .Acknowledge()
                     .LogExceptions()
             )
             .Bind(builder.Configuration.GetSection("Kafka:Consumer"))
@@ -27,12 +33,12 @@ builder.Services
             {
                 options.ClientConfig.AutoOffsetReset = AutoOffsetReset.Earliest;
                 // options.ClientConfig.EnableAutoCommit = false; // DryRun
+                // options.ClientConfig.EnableAutoOffsetStore = false; // Manually acknowledge every message
             })
             .ValidateDataAnnotations();
     });
 
 await builder.Build().RunAsync();
-
 
 
 [UsedImplicitly]

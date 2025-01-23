@@ -9,7 +9,7 @@ namespace LocalPost.KafkaConsumer.Tests;
 // See also https://github.com/testcontainers/testcontainers-dotnet/blob/develop/src/Testcontainers.Kafka/KafkaBuilder.cs
 public sealed class RedpandaBuilder : ContainerBuilder<RedpandaBuilder, RedpandaContainer, ContainerConfiguration>
 {
-    public const string RedpandaImage = "docker.redpanda.com/redpandadata/redpanda:v24.3.2";
+    public const string RedpandaImage = "docker.redpanda.com/redpandadata/redpanda:v24.3.3";
 
     public const ushort KafkaPort = 9092;
     public const ushort KafkaAdminPort = 9644;

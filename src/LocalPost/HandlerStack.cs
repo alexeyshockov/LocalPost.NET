@@ -14,7 +14,7 @@ public static class HandlerStack
     public static HandlerFactory<T> For<T>(Action<T> syncHandler) => For<T>((payload, _) =>
     {
         syncHandler(payload);
-        return default;
+        return ValueTask.CompletedTask;
     });
 
     public static HandlerFactory<T> For<T>(Handler<T> handler) => _ => handler;

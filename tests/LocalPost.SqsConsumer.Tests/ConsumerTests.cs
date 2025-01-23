@@ -16,7 +16,7 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
         .WithEnvironment("SERVICES", "sqs")
         .Build();
 
-    private readonly AWSCredentials _credentials = new BasicAWSCredentials("LSIAQAAAAAAVNCBMPNSG", "any");
+    private readonly AWSCredentials _credentials = new BasicAWSCredentials("test", "test");
 
     private const string QueueName = "weather-forecasts";
 

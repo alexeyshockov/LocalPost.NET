@@ -28,7 +28,7 @@ services:
   redpanda:
     # Mainly from: https://docs.redpanda.com/redpanda-labs/docker-compose/single-broker/
     # See also: https://docs.redpanda.com/current/deploy/deployment-option/self-hosted/docker-image/
-    image: docker.redpanda.com/redpandadata/redpanda:v24.3.2
+    image: docker.redpanda.com/redpandadata/redpanda:v24.3.3
     container_name: redpanda
     command:
       - redpanda start
@@ -64,7 +64,7 @@ services:
 #      retries: 5
 #      start_period: 5s
   redpanda-console:
-    image: docker.redpanda.com/redpandadata/console:v2.8.1
+    image: docker.redpanda.com/redpandadata/console:v2.8.2
     entrypoint: /bin/sh
     command: -c "echo \"$$CONSOLE_CONFIG_FILE\" > /tmp/config.yml; /app/console"
     environment:

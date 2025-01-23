@@ -6,9 +6,8 @@ namespace LocalPost.KafkaConsumer;
 public sealed record ConsumerOptions
 {
     public ConsumerConfig ClientConfig { get; set; } = new();
-    // public required ConsumerConfig ClientConfig { get; init; } = new()
     // {
-    //     EnableAutoOffsetStore = false // We will store offsets manually, see Acknowledge middleware
+    //     EnableAutoOffsetStore = false // Store offsets manually, see Acknowledge middleware
     // };
 
     [MinLength(1)]

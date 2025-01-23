@@ -27,12 +27,12 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
         await producer.ProduceAsync(Topic, new Message<string, string>
         {
             Key = "London",
-            Value = "It will rainy in London tomorrow"
+            Value = "It will be rainy in London tomorrow"
         });
         await producer.ProduceAsync(Topic, new Message<string, string>
         {
             Key = "Paris",
-            Value = "It will rainy in London tomorrow"
+            Value = "It will be sunny in Paris tomorrow"
         });
     }
 
@@ -62,6 +62,7 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
                 // Already set, see above
                 // co.ClientConfig.GroupId = "test-consumer";
                 co.Topics.Add(Topic);
+                co.ClientConfig.EnableAutoOffsetStore = false; // Manually acknowledge every message
                 // Otherwise the client attaches to the end of the topic, skipping all the published messages
                 co.ClientConfig.AutoOffsetReset = AutoOffsetReset.Earliest;
             })

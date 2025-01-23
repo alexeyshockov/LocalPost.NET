@@ -41,7 +41,7 @@ public readonly record struct ConsumeContext<T>
     public ConsumeContext<TOut> Transform<TOut>(Func<ConsumeContext<T>, TOut> transform) => Transform(transform(this));
 
     public async Task<ConsumeContext<TOut>> Transform<TOut>(Func<ConsumeContext<T>, Task<TOut>> transform) =>
-        Transform(await transform(this));
+        Transform(await transform(this).ConfigureAwait(false));
 
     public static implicit operator T(ConsumeContext<T> context) => context.Payload;
 
