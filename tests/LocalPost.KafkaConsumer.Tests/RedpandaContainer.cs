@@ -76,18 +76,8 @@ public sealed class RedpandaBuilder : ContainerBuilder<RedpandaBuilder, Redpanda
     }
 }
 
-
-
 public sealed class RedpandaContainer(IContainerConfiguration configuration) : DockerContainer(configuration)
 {
-    public override async Task StartAsync(CancellationToken ct = default)
-    {
-        await base.StartAsync(ct);
-
-        // Dirty fix, but otherwise the client just fails with strange errors
-        await Task.Delay(3_000, ct);
-    }
-
     public string GetSchemaRegistryAddress() =>
         new UriBuilder(Uri.UriSchemeHttp, Hostname, GetMappedPublicPort(RedpandaBuilder.SchemaRegistryPort)).ToString();
 

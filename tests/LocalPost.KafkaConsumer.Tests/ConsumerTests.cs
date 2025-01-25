@@ -23,7 +23,7 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
             BootstrapServers = _container.GetBootstrapAddress()
         }).Build();
 
-        // Redpanda: by default, topic is created automatically on the first message
+        // Redpanda creates a topic automatically if it doesn't exist
         await producer.ProduceAsync(Topic, new Message<string, string>
         {
             Key = "London",

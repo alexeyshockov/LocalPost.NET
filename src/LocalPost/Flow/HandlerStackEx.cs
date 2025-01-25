@@ -20,8 +20,8 @@ public static partial class HandlerStackEx
 
     public static HandlerManagerFactory<T> Batch<T>(this HandlerFactory<ImmutableArray<T>> hf,
         int size, TimeSpan window,
-        int capacity = 1, int consumers = 1, bool singleProducer = false) =>
-        hf.AsHandlerManager().Batch(size, window, capacity, consumers, singleProducer);
+        int capacity = 1, bool singleProducer = false) =>
+        hf.AsHandlerManager().Batch(size, window, capacity, singleProducer);
 }
 
 [PublicAPI]
@@ -56,10 +56,10 @@ public static partial class HandlerManagerStackEx
 
     public static HandlerManagerFactory<T> Batch<T>(this HandlerManagerFactory<ImmutableArray<T>> hmf,
         int size, TimeSpan window,
-        int capacity = 1, int consumers = 1, bool singleProducer = false) => provider =>
+        int capacity = 1, bool singleProducer = false) => provider =>
     {
         var next = hmf(provider);
-        return BatchHandlerManager<T>.Create(next, size, window, capacity, consumers, singleProducer);
+        return BatchHandlerManager<T>.Create(next, size, window, capacity, singleProducer);
     };
 }
 
@@ -78,16 +78,15 @@ internal sealed class BatchHandlerManager<T>(Channel<T> channel,
 {
     public static BatchHandlerManager<T> Create(IHandlerManager<ImmutableArray<T>> next,
         int size, TimeSpan window,
-        int capacity = 1, int consumers = 1, bool singleProducer = false)
+        int capacity = 1, bool singleProducer = false)
     {
         var channel = Channel.CreateBounded<T>(new BoundedChannelOptions(capacity)
         {
             FullMode = BoundedChannelFullMode.Wait,
-            SingleReader = consumers == 1,
+            SingleReader = true,
             SingleWriter = singleProducer,
         });
-        // var handler = hf(provider);
-        var buffer = new ChannelRunner<T, ImmutableArray<T>>(channel, Consume, next) { Consumers = consumers };
+        var buffer = new ChannelRunner<T, ImmutableArray<T>>(channel, Consume, next) { Consumers = 1 };
         var hm = new BatchHandlerManager<T>(channel, buffer);
         return hm;
 
@@ -126,6 +125,7 @@ internal sealed class BatchHandlerManager<T>(Channel<T> channel,
                 // Otherwise, the contents will be copied into a new array. The internal buffer will then be set to a
                 // zero length array.
                 var batch = batchBuilder.DrainToImmutable();
+
                 await next.Handle(batch, CancellationToken.None).ConfigureAwait(false);
             }
         };
@@ -140,7 +140,6 @@ internal sealed class BatchHandlerManager<T>(Channel<T> channel,
 
 internal static class ChannelRunner
 {
-    // public static ChannelRunner<T, T> Create<T>(Channel<T> channel, Handler<Event<T>> handler,
     public static ChannelRunner<T, T> Create<T>(Channel<T> channel, IHandlerManager<T> handler,
         int consumers = 1, bool processLeftovers = true)
     {
@@ -156,7 +155,6 @@ internal static class ChannelRunner
 }
 
 internal sealed class ChannelRunner<T, TOut>(Channel<T> channel,
-    // Func<CancellationToken, Task> consumer, Handler<Event<TOut>> handler) : IDisposable
     Func<CancellationToken, Task> consumer, IHandlerManager<TOut> handler) : IDisposable
 {
     public HealthCheckResult Ready => (_execTokenSource, _exec, _execException) switch
@@ -184,7 +182,6 @@ internal sealed class ChannelRunner<T, TOut>(Channel<T> channel,
 
         var execTokenSource = _execTokenSource = new CancellationTokenSource();
 
-        // await handler(Event<TOut>.Begin, ct).ConfigureAwait(false);
         await handler.Start(ct).ConfigureAwait(false);
 
         _exec = Run(execTokenSource.Token);
@@ -199,7 +196,6 @@ internal sealed class ChannelRunner<T, TOut>(Channel<T> channel,
         };
         await exec.ConfigureAwait(false);
 
-        // await handler(Event<TOut>.End, _completionToken).ConfigureAwait(false);
         await handler.Stop(_execException, _completionToken).ConfigureAwait(false);
     }
 

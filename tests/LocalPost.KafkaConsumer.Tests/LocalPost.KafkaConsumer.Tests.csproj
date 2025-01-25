@@ -6,8 +6,8 @@
 
     <ItemGroup>
         <PackageReference Include="Testcontainers" Version="4.*" />
-<!--        <PackageReference Include="Testcontainers.Kafka" Version="3.*" />-->
-<!--        <PackageReference Include="Testcontainers.Redpanda" Version="3.*" />-->
+<!--        <PackageReference Include="Testcontainers.Kafka" Version="4.*" />-->
+<!--        <PackageReference Include="Testcontainers.Redpanda" Version="4.*" />-->
 
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.*" />
     </ItemGroup>
