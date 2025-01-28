@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Confluent.Kafka;
 using JetBrains.Annotations;
 using LocalPost;
@@ -21,9 +22,9 @@ builder.Services
             .ValidateDataAnnotations();
         kafka.AddConsumer("example-consumer-group",
                 HandlerStack.From<MessageHandler, WeatherForecast>()
-                    .UseKafkaPayload()
                     .Scoped()
-                    .DeserializeJson()
+                    .UseKafkaPayload()
+                    .Deserialize(context => JsonSerializer.Deserialize<WeatherForecast>(context.Payload)!)
                     .Trace()
                     // .Acknowledge()
                     .LogExceptions()

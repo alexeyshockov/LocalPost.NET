@@ -44,7 +44,7 @@ internal static class SqsActivityExtensions
     public static void SetDefaultTags(this Activity? activity, QueueClient client)
     {
         // See https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/#messaging-attributes
-        activity?.SetTag("messaging.system", "sqs");
+        activity?.SetTag("messaging.system", "aws_sqs");
 
         activity?.SetTag("messaging.destination.name", client.QueueName);
 
@@ -56,8 +56,8 @@ internal static class SqsActivityExtensions
     public static Activity? SetTagsFor<T>(this Activity? activity, ConsumeContext<T> context) =>
         activity?.SetTag("messaging.message.id", context.MessageId);
 
-    public static Activity? SetTagsFor<T>(this Activity? activity, IReadOnlyCollection<ConsumeContext<T>> context) =>
-        activity?.SetTag("messaging.batch.message_count", context.Count);
+    public static Activity? SetTagsFor<T>(this Activity? activity, IReadOnlyCollection<ConsumeContext<T>> batch) =>
+        activity?.SetTag("messaging.batch.message_count", batch.Count);
 
     public static Activity? SetTagsFor(this Activity? activity, ReceiveMessageResponse response) =>
         activity?.SetTag("messaging.batch.message_count", response.Messages.Count);
@@ -75,10 +75,27 @@ internal static class Tracing
 
     static Tracing()
     {
-        // See https://stackoverflow.com/a/909583/322079
         var assembly = Assembly.GetExecutingAssembly();
-        var version = assembly.GetName().Version;
-        Source = new ActivitySource(assembly.FullName, version.ToString());
+        var version = assembly.GetName().Version?.ToString() ?? "0.0.0";
+        Source = new ActivitySource("LocalPost.SqsConsumer", version);
+    }
+
+    public static Activity? StartProcessing<T>(IReadOnlyCollection<ConsumeContext<T>> batch)
+    {
+        Debug.Assert(batch.Count > 0);
+        var client = batch.First().Client;
+        var activity = Source.CreateActivity($"{client.QueueName} process", ActivityKind.Consumer);
+        if (activity is { IsAllDataRequested: true })
+        {
+            activity?.SetTag("messaging.operation.type", "process");
+            activity.SetDefaultTags(client);
+            activity.SetTagsFor(batch);
+            // TODO Distributed tracing (OTEL links)
+        }
+
+        activity?.Start();
+
+        return activity;
     }
 
     public static Activity? StartProcessing<T>(ConsumeContext<T> context)
@@ -86,6 +103,7 @@ internal static class Tracing
         var activity = Source.CreateActivity($"{context.Client.QueueName} process", ActivityKind.Consumer);
         if (activity is { IsAllDataRequested: true })
         {
+            activity.SetTag("messaging.operation.type", "process");
             activity.SetDefaultTags(context.Client);
             activity.SetTagsFor(context);
             activity.AcceptDistributedTracingFrom(context.Message);
@@ -102,6 +120,7 @@ internal static class Tracing
         if (activity is not { IsAllDataRequested: true })
             return activity;
 
+        activity.SetTag("messaging.operation.type", "settle");
         activity.SetDefaultTags(context.Client);
         activity.SetTag("messaging.message.id", context.MessageId);
 
@@ -114,6 +133,7 @@ internal static class Tracing
         if (activity is not { IsAllDataRequested: true })
             return activity;
 
+        activity.SetTag("messaging.operation.type", "receive");
         activity.SetDefaultTags(client);
 
         return activity;

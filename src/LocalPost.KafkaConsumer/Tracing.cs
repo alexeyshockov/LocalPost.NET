@@ -68,12 +68,19 @@ internal static class KafkaActivityExtensions
 
         activity?.SetTag("messaging.message.body.size", context.Message.Value.Length);
 
-        // TODO messaging.operation.type
-
         // Skip, as we always ignore the key on consumption
         // activity.SetTag("messaging.kafka.message.key", context.Message.Key);
 
         // TODO error.type
+
+        return activity;
+    }
+
+    public static Activity? SetTagsFor<T>(this Activity? activity, IReadOnlyCollection<ConsumeContext<T>> batch)
+    {
+        activity?.SetTag("messaging.batch.message_count", batch.Count);
+        if (batch.Count > 0)
+            activity?.SetTag("messaging.destination.name", batch.First().Topic);
 
         return activity;
     }
@@ -94,10 +101,25 @@ internal static class Tracing
 
     static Tracing()
     {
-        // See https://stackoverflow.com/a/909583/322079
         var assembly = Assembly.GetExecutingAssembly();
-        var version = assembly.GetName().Version;
-        Source = new ActivitySource(assembly.FullName, version.ToString());
+        var version = assembly.GetName().Version?.ToString() ?? "0.0.0";
+        Source = new ActivitySource("LocalPost.KafkaConsumer", version);
+    }
+
+    public static Activity? StartProcessing<T>(IReadOnlyCollection<ConsumeContext<T>> batch)
+    {
+        Debug.Assert(batch.Count > 0);
+        var activity = Source.CreateActivity($"{batch.First().Topic} process", ActivityKind.Consumer);
+        if (activity is { IsAllDataRequested: true })
+        {
+            activity.SetTag("messaging.operation.type", "process");
+            activity.SetDefaultTags(batch.First().Client);
+            activity.SetTagsFor(batch);
+        }
+
+        activity?.Start();
+
+        return activity;
     }
 
     public static Activity? StartProcessing<T>(ConsumeContext<T> context)
@@ -105,6 +127,7 @@ internal static class Tracing
         var activity = Source.CreateActivity($"{context.Topic} process", ActivityKind.Consumer);
         if (activity is { IsAllDataRequested: true })
         {
+            activity.SetTag("messaging.operation.type", "process");
             activity.SetDefaultTags(context.Client);
             activity.SetTagsFor(context);
             activity.AcceptDistributedTracingFrom(context.Message);

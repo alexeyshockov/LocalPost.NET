@@ -11,9 +11,8 @@ internal static class Tracing
 
     static Tracing()
     {
-        // See https://stackoverflow.com/a/909583/322079
         var assembly = Assembly.GetExecutingAssembly();
-        var version = assembly.GetName().Version;
-        Source = new ActivitySource(assembly.FullName, version.ToString());
+        var version = assembly.GetName().Version?.ToString() ?? "0.0.0";
+        Source = new ActivitySource("LocalPost.BackgroundQueue", version);
     }
 }

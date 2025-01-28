@@ -4,7 +4,7 @@ using JetBrains.Annotations;
 namespace LocalPost.BackgroundQueue;
 
 [PublicAPI]
-public readonly record struct ConsumeContext<T> // TODO Rename
+public readonly record struct ConsumeContext<T> // Better name?..
 {
     public readonly ActivityContext? ActivityContext;
     public readonly T Payload;

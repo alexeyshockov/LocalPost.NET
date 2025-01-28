@@ -14,33 +14,24 @@ public sealed class SqsBuilder(IServiceCollection services)
     /// <summary>
     ///     Add an SQS consumer with a custom message handler.
     /// </summary>
-    /// <param name="hf">Message handler factory.</param>
+    /// <param name="hmf">Message handler factory.</param>
     /// <returns>Consumer options builder.</returns>
-    public OptionsBuilder<ConsumerOptions> AddConsumer(HandlerFactory<ConsumeContext<string>> hf) =>
-        AddConsumer(Options.DefaultName, hf);
+    public OptionsBuilder<ConsumerOptions> AddConsumer(HandlerManagerFactory<ConsumeContext<string>> hmf) =>
+        AddConsumer(Options.DefaultName, hmf);
 
     /// <summary>
     ///     Add an SQS consumer with a custom message handler.
     /// </summary>
     /// <param name="name">Consumer name (should be unique in the application). Also, the default queue name.</param>
-    /// <param name="hf">Message handler factory.</param>
+    /// <param name="hmf">Message handler factory.</param>
     /// <returns>Consumer options builder.</returns>
-    public OptionsBuilder<ConsumerOptions> AddConsumer(string name, HandlerFactory<ConsumeContext<string>> hf) =>
-        AddConsumer(name, hf.AsHandlerManager());
-
-    /// <summary>
-    ///     Add an SQS consumer with a custom message handler.
-    /// </summary>
-    /// <param name="name">Consumer name (should be unique in the application). Also, the default queue name.</param>
-    /// <param name="hf">Message handler factory.</param>
-    /// <returns>Consumer options builder.</returns>
-    public OptionsBuilder<ConsumerOptions> AddConsumer(string name, HandlerManagerFactory<ConsumeContext<string>> hf)
+    public OptionsBuilder<ConsumerOptions> AddConsumer(string name, HandlerManagerFactory<ConsumeContext<string>> hmf)
     {
         var added = services.TryAddKeyedSingleton(name, (provider, _) => new Consumer(name,
             provider.GetLoggerFor<Consumer>(),
             provider.GetRequiredService<IAmazonSQS>(),
             provider.GetOptions<ConsumerOptions>(name),
-            hf(provider)
+            hmf(provider)
         ));
 
         if (!added)

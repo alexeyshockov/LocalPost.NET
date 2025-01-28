@@ -14,27 +14,18 @@ public sealed class KafkaBuilder(IServiceCollection services)
     /// <summary>
     ///     Add a Kafka consumer with a custom message handler.
     /// </summary>
-    /// <param name="hf">Message handler factory.</param>
+    /// <param name="hmf">Message handler factory.</param>
     /// <returns>Consumer options builder.</returns>
-    public OptionsBuilder<ConsumerOptions> AddConsumer(HandlerFactory<ConsumeContext<byte[]>> hf) =>
-        AddConsumer(Options.DefaultName, hf);
+    public OptionsBuilder<ConsumerOptions> AddConsumer(HandlerManagerFactory<ConsumeContext<byte[]>> hmf) =>
+        AddConsumer(Options.DefaultName, hmf);
 
     /// <summary>
     ///     Add a Kafka consumer with a custom message handler.
     /// </summary>
     /// <param name="name">Consumer name (should be unique in the application). Also, the default group ID.</param>
-    /// <param name="hf">Message handler factory.</param>
+    /// <param name="hmf">Message handler factory.</param>
     /// <returns>Consumer options builder.</returns>
-    public OptionsBuilder<ConsumerOptions> AddConsumer(string name, HandlerFactory<ConsumeContext<byte[]>> hf) =>
-        AddConsumer(name, hf.AsHandlerManager());
-
-    /// <summary>
-    ///     Add a Kafka consumer with a custom message handler.
-    /// </summary>
-    /// <param name="name">Consumer name (should be unique in the application). Also, the default group ID.</param>
-    /// <param name="hf">Message handler factory.</param>
-    /// <returns>Consumer options builder.</returns>
-    public OptionsBuilder<ConsumerOptions> AddConsumer(string name, HandlerManagerFactory<ConsumeContext<byte[]>> hf)
+    public OptionsBuilder<ConsumerOptions> AddConsumer(string name, HandlerManagerFactory<ConsumeContext<byte[]>> hmf)
     {
         var added = services.TryAddKeyedSingleton(name, (provider, _) =>
         {
@@ -46,7 +37,7 @@ public sealed class KafkaBuilder(IServiceCollection services)
             return new Consumer(name,
                 provider.GetLoggerFor<Consumer>(),
                 clientFactory,
-                hf(provider)
+                hmf(provider)
             );
         });
 

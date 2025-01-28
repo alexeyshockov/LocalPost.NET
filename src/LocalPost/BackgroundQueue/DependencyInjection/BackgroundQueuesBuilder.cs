@@ -18,19 +18,23 @@ public class BackgroundQueuesBuilder(IServiceCollection services)
     );
 
     // TODO Open later
-    internal OptionsBuilder<QueueOptions<BackgroundJob>> AddJobQueue(HandlerFactory<ConsumeContext<BackgroundJob>> hf)
+    internal OptionsBuilder<QueueOptions<BackgroundJob>> AddJobQueue(
+        HandlerManagerFactory<ConsumeContext<BackgroundJob>> hmf)
     {
         services.TryAddSingleton<BackgroundJobQueue>();
         services.TryAddSingletonAlias<IBackgroundJobQueue, BackgroundJobQueue>();
 
-        return AddQueue(hf);
+        return AddQueue(hmf);
     }
 
-    public OptionsBuilder<QueueOptions<T>> AddQueue<T>(HandlerFactory<ConsumeContext<T>> hf) =>
-        AddQueue(Options.DefaultName, hf);
+    // public OptionsBuilder<QueueOptions<T>> AddQueue<T>(HandlerFactory<ConsumeContext<T>> hf) =>
+    //     AddQueue(Options.DefaultName, hf);
+    //
+    // public OptionsBuilder<QueueOptions<T>> AddQueue<T>(string name, HandlerFactory<ConsumeContext<T>> hf) =>
+    //     AddQueue<T>(name, provider => new HandlerManager<T>(hf(provider)));
 
-    public OptionsBuilder<QueueOptions<T>> AddQueue<T>(string name, HandlerFactory<ConsumeContext<T>> hf) =>
-        AddQueue<T>(name, hf.AsHandlerManager());
+    public OptionsBuilder<QueueOptions<T>> AddQueue<T>(HandlerManagerFactory<ConsumeContext<T>> hmf) =>
+        AddQueue(Options.DefaultName, hmf);
 
     public OptionsBuilder<QueueOptions<T>> AddQueue<T>(string name, HandlerManagerFactory<ConsumeContext<T>> hmf)
     {
@@ -44,7 +48,7 @@ public class BackgroundQueuesBuilder(IServiceCollection services)
 
         return QueueFor<T>(name);
 
-        BackgroundQueue<T> CreateQueue(IServiceProvider provider, object? key)
+        BackgroundQueue<T> CreateQueue(IServiceProvider provider, object? _)
         {
             var settings = provider.GetOptions<QueueOptions<T>>(name);
             var channel = settings.Capacity switch
@@ -62,9 +66,8 @@ public class BackgroundQueuesBuilder(IServiceCollection services)
                 })
             };
             var hm = hmf(provider);
-            var runner = ChannelRunner.Create(channel, hm, settings.MaxConcurrency, settings.ProcessLeftovers);
 
-            return new BackgroundQueue<T>(provider.GetLoggerFor<BackgroundQueue<T>>(), settings, channel, runner);
+            return new BackgroundQueue<T>(provider.GetLoggerFor<BackgroundQueue<T>>(), settings, channel, hm);
         }
     }
 

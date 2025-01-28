@@ -107,4 +107,11 @@ internal sealed class QueueClient(ILogger logger, IAmazonSQS sqs, ConsumerOption
 
         // TODO Log failures?..
     }
+
+    public async Task DeleteMessages<T>(IEnumerable<ConsumeContext<T>> batch, CancellationToken ct = default)
+    {
+        // TODO DeleteMessageBatch
+        foreach (var context in batch)
+            await sqs.DeleteMessageAsync(QueueUrl, context.ReceiptHandle, ct).ConfigureAwait(false);
+    }
 }

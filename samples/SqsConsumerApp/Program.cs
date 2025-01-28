@@ -3,6 +3,9 @@ using JetBrains.Annotations;
 using LocalPost;
 using LocalPost.SqsConsumer;
 using LocalPost.SqsConsumer.DependencyInjection;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Sinks.FingersCrossed;
 
@@ -19,15 +22,37 @@ builder.Services.Configure<HostOptions>(options =>
     options.ServicesStopConcurrently = true;
 });
 
+#region OpenTelemetry
+
+// See also: https://learn.microsoft.com/en-us/dotnet/core/diagnostics/observability-otlp-example
+
+// To use full potential of Serilog, it's better to use Serilog.Sinks.OpenTelemetry,
+// see https://github.com/Blind-Striker/dotnet-otel-aspire-localstack-demo as an example
+// builder.Logging.AddOpenTelemetry(logging =>
+// {
+//     logging.IncludeFormattedMessage = true;
+//     logging.IncludeScopes = true;
+// });
+
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics => metrics
+        .AddAWSInstrumentation())
+    .WithTracing(tracing => tracing
+        .AddSource("LocalPost.*")
+        .AddAWSInstrumentation())
+    .UseOtlpExporter();
+
+#endregion
+
 builder.Services
     .AddScoped<MessageHandler>()
     .AddSqsConsumers(sqs =>
     {
         sqs.Defaults.Configure(options => options.MaxNumberOfMessages = 1);
-        sqs.AddConsumer("weather-forecasts",
+        sqs.AddConsumer("weather-forecasts", // Also acts as a queue name
             HandlerStack.From<MessageHandler, WeatherForecast>()
-                .UseSqsPayload()
                 .Scoped()
+                .UseSqsPayload()
                 .DeserializeJson()
                 .Trace()
                 .Acknowledge() // Do not include DeleteMessage call in the OpenTelemetry root span (transaction)
@@ -36,7 +61,6 @@ builder.Services
         );
     });
 
-// TODO Health + Supervisor
 await builder.Build().RunAsync();
 
 
@@ -56,10 +80,10 @@ public class MessageHandler : IHandler<WeatherForecast>
     }
 }
 
-public static class FingersCrossedLogging
+public static class HandlerStackEx
 {
-    public static HandlerFactory<T> LogFingersCrossed<T>(this HandlerFactory<T> hf) =>
-        hf.Touch(next => async (context, ct) =>
+    public static HandlerManagerFactory<T> LogFingersCrossed<T>(this HandlerManagerFactory<T> hmf) =>
+        hmf.TouchHandler(next => async (context, ct) =>
         {
             using var logBuffer = LogBuffer.BeginScope();
             try

@@ -7,7 +7,7 @@ using Microsoft.Extensions.Hosting;
 namespace LocalPost.KafkaConsumer;
 
 internal sealed class Consumer(string name, ILogger logger,
-    ClientFactory clientFactory, IHandlerManager<ConsumeContext<byte[]>> handler)
+    ClientFactory clientFactory, IHandlerManager<ConsumeContext<byte[]>> hm)
     : IHostedService, IHealthAwareService, IDisposable
 {
     private Clients _clients = new([]);
@@ -30,7 +30,7 @@ internal sealed class Consumer(string name, ILogger logger,
 
     public IHealthCheck ReadinessCheck => HealthChecks.From(() => Ready);
 
-    private async Task RunConsumerAsync(Client client, CancellationToken execToken)
+    private async Task RunConsumerAsync(Client client, Handler<ConsumeContext<byte[]>> handler, CancellationToken execToken)
     {
         // (Optionally) wait for app start
 
@@ -39,8 +39,8 @@ internal sealed class Consumer(string name, ILogger logger,
             while (!execToken.IsCancellationRequested)
             {
                 var result = client.Consume(execToken);
-                await handler.Handle(new ConsumeContext<byte[]>(client, result, result.Message.Value), CancellationToken.None)
-                    .ConfigureAwait(false);
+                var context = new ConsumeContext<byte[]>(client, result, result.Message.Value);
+                await handler(context, CancellationToken.None).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException e) when (e.CancellationToken == execToken)
@@ -76,7 +76,7 @@ internal sealed class Consumer(string name, ILogger logger,
         logger.LogInformation("Kafka consumer started");
 
         logger.LogDebug("Invoking the event handler...");
-        await handler.Start(ct).ConfigureAwait(false);
+        var handler = await hm.Start(ct).ConfigureAwait(false);
         logger.LogDebug("Event handler started");
 
         _exec = ObserveExecution();
@@ -87,11 +87,11 @@ internal sealed class Consumer(string name, ILogger logger,
             try
             {
                 var executions = clients.Select(client =>
-                    Task.Run(() => RunConsumerAsync(client, execTokenSource.Token), ct)
+                    Task.Run(() => RunConsumerAsync(client, handler, execTokenSource.Token), ct)
                 ).ToArray();
                 await (executions.Length == 1 ? executions[0] : Task.WhenAll(executions)).ConfigureAwait(false);
 
-                await handler.Stop(_execException, _completionToken).ConfigureAwait(false);
+                await hm.Stop(_execException, _completionToken).ConfigureAwait(false);
             }
             finally
             {

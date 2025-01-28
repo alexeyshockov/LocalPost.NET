@@ -6,92 +6,115 @@ namespace LocalPost;
 
 public static partial class Middlewares
 {
-    public static HandlerFactory<byte[]> DecodeString(this HandlerFactory<string> hf) =>
-        DecodeString(hf, Encoding.UTF8);
+    public static HandlerManagerFactory<byte[]> DecodeString(this HandlerManagerFactory<string> hmf) =>
+        DecodeString(hmf, Encoding.UTF8);
 
-    public static HandlerFactory<byte[]> DecodeString(this HandlerFactory<string> hf, Encoding encoding) => hf.Map<byte[], string>(next => async (payload, ct) =>
-    {
-        var s = encoding.GetString(payload);
-        await next(s, ct).ConfigureAwait(false);
-    });
+    public static HandlerManagerFactory<byte[]> DecodeString(this HandlerManagerFactory<string> hmf,
+        Encoding encoding) => hmf.MapHandler<byte[], string>(next =>
+        async (payload, ct) =>
+        {
+            var s = encoding.GetString(payload);
+            await next(s, ct).ConfigureAwait(false);
+        });
 
     /// <summary>
     ///     Handle exceptions and log them, to not break the consumer loop.
     /// </summary>
-    /// <param name="hf">Handler factory to wrap.</param>
+    /// <param name="hmf">Handler factory to wrap.</param>
     /// <typeparam name="T">Handler's payload type.</typeparam>
     /// <returns>Wrapped handler factory.</returns>
-    public static HandlerFactory<T> LogExceptions<T>(this HandlerFactory<T> hf) => provider =>
+    public static HandlerManagerFactory<T> LogExceptions<T>(this HandlerManagerFactory<T> hmf) => provider =>
     {
         var logger = provider.GetRequiredService<ILogger<T>>();
-        var next = hf(provider);
-
-        return async (context, ct) =>
-        {
-            try
+        return hmf(provider).Touch(next => async (context, ct) =>
             {
-                await next(context, ct).ConfigureAwait(false);
+                try
+                {
+                    await next(context, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException e) when (e.CancellationToken == ct)
+                {
+                    throw;
+                }
+                catch (Exception e)
+                {
+                    logger.LogError(e, "Unhandled exception while processing a message");
+                }
             }
-            catch (OperationCanceledException e) when (e.CancellationToken == ct)
-            {
-                throw;
-            }
-            catch (Exception e)
-            {
-                logger.LogError(e, "Unhandled exception while processing a message");
-            }
-        };
+        );
     };
 
     /// <summary>
     ///     Create a DI scope for every message and resolve the handler from it.
     /// </summary>
-    /// <param name="hf">Handler factory to wrap.</param>
+    /// <param name="hmf">Handler factory to wrap.</param>
     /// <typeparam name="T">Handler's payload type.</typeparam>
     /// <returns>Wrapped handler factory.</returns>
-    public static HandlerFactory<T> Scoped<T>(this HandlerFactory<T> hf) => provider =>
-        new ScopedHandler<T>(provider.GetRequiredService<IServiceScopeFactory>(), hf).InvokeAsync;
+    public static HandlerManagerFactory<T> Scoped<T>(this HandlerManagerFactory<T> hmf) => provider =>
+        new ScopedHandlerManager<T>(provider.GetRequiredService<IServiceScopeFactory>(), hmf);
 
     /// <summary>
     ///     Shutdown the whole app on error.
     /// </summary>
-    /// <param name="hf">Handler factory to wrap.</param>
+    /// <param name="hmf">Handler factory to wrap.</param>
     /// <param name="exitCode">Process exit code.</param>
     /// <typeparam name="T">Handler's payload type.</typeparam>
     /// <returns>Wrapped handler factory.</returns>
-    public static HandlerFactory<T> ShutdownOnError<T>(this HandlerFactory<T> hf, int exitCode = 1) => provider =>
-    {
-        var appLifetime = provider.GetRequiredService<IHostApplicationLifetime>();
-        var next = hf(provider);
-
-        return async (context, ct) =>
+    public static HandlerManagerFactory<T> ShutdownOnError<T>(this HandlerManagerFactory<T> hmf, int exitCode = 1) =>
+        provider =>
         {
-            try
+            var appLifetime = provider.GetRequiredService<IHostApplicationLifetime>();
+            return hmf(provider).Touch(next => async (context, ct) =>
             {
-                await next(context, ct).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException e) when (e.CancellationToken == ct)
-            {
-                throw;
-            }
-            catch
-            {
-                appLifetime.StopApplication();
-                Environment.ExitCode = exitCode;
-            }
+                try
+                {
+                    await next(context, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException e) when (e.CancellationToken == ct)
+                {
+                    throw;
+                }
+                catch
+                {
+                    appLifetime.StopApplication();
+                    Environment.ExitCode = exitCode;
+                }
+            });
         };
-    };
 }
 
-internal sealed class ScopedHandler<T>(IServiceScopeFactory sf, HandlerFactory<T> hf) : IHandler<T>
+
+internal sealed class ScopedHandlerManager<T>(IServiceScopeFactory sf, HandlerManagerFactory<T> hmf)
+    : IHandlerManager<T>
 {
-    public async ValueTask InvokeAsync(T payload, CancellationToken ct)
+    private async ValueTask Handle(T payload, CancellationToken ct)
     {
         // See https://andrewlock.net/exploring-dotnet-6-part-10-new-dependency-injection-features-in-dotnet-6/#handling-iasyncdisposable-services-with-iservicescope
         // And also https://devblogs.microsoft.com/dotnet/announcing-net-6/#microsoft-extensions-dependencyinjection-createasyncscope-apis
         await using var scope = sf.CreateAsyncScope();
 
-        var handler = hf(scope.ServiceProvider);
-        await handler(payload, ct).ConfigureAwait(false);
+        var hm = hmf(scope.ServiceProvider);
+        var handler = await hm.Start(ct).ConfigureAwait(false);
+        try
+        {
+            await handler(payload, ct).ConfigureAwait(false);
+            await hm.Stop(null, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException e) when (e.CancellationToken == ct)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            await hm.Stop(e, ct).ConfigureAwait(false);
+        }
     }
+
+    public ValueTask<Handler<T>> Start(CancellationToken ct)
+    {
+        Handler<T> handler = Handle;
+        return ValueTask.FromResult(handler);
+    }
+
+    public ValueTask Stop(Exception? error, CancellationToken ct) => ValueTask.CompletedTask;
 }

@@ -1,74 +1,29 @@
 namespace LocalPost;
 
+
 [PublicAPI]
-public static class HandlerStackOps
+public static partial class HandlerStackOps
 {
-    // Just resolve it manually, it's one line longer, same cognitive load or even less, and one additional type less
-    // public static HandlerFactory<TIn> Map<TIn, TOut>(this HandlerFactory<TOut> hf,
-    //     HandlerMiddlewareFactory<TIn, TOut> middlewareFactory) => provider =>
-    // {
-    //     var h = hf(provider);
-    //     var m = middlewareFactory(provider);
-    //
-    //     return m(h);
-    // };
+    public static IHandlerManager<TIn> Map<TIn, TOut>(this IHandlerManager<TOut> hm,
+        HandlerMiddleware<TIn, TOut> middleware) => new HandlerDecorator<TIn, TOut>(hm, middleware);
 
-    // Too narrow use case, and makes Map() inconvenient to use
-    // public static HandlerFactory<TIn> Map<TIn, TOut>(this HandlerFactory<TOut> hf,
-    //     Func<IServiceProvider, IHandlerMiddleware<TIn, TOut>> middlewareFactory) => hf.Map<TIn, TOut>(provider =>
-    //     middlewareFactory(provider).Invoke);
-    // public static HandlerFactory<TIn> Map<TIn, TOut>(this HandlerFactory<TOut> hf,
-    //     Func<IServiceProvider, IHandlerMiddleware<TIn, TOut>> middlewareFactory) => provider =>
-    // {
-    //     var handler = hf(provider);
-    //     return middlewareFactory(provider).Invoke(handler);
-    // };
-    // public static HandlerFactory<TIn> Map<TIn, TOut>(this HandlerFactory<TOut> hf,
-    //     where T : IHandlerMiddleware<TIn, TOut> => hf.Map<TIn, TOut>(provider =>
-    //     ActivatorUtilities.CreateInstance<T>(provider).Invoke);
+    public static IHandlerManager<T> Touch<T>(this IHandlerManager<T> hm,
+        HandlerMiddleware<T, T> middleware) => hm.Map(middleware);
 
-    public static HandlerFactory<TIn> Map<TIn, TOut>(this HandlerFactory<TOut> hf,
-        HandlerMiddleware<TIn, TOut> middleware) => provider =>
+    public static HandlerManagerFactory<TIn> Map<TIn, TOut>(this HandlerManagerFactory<TOut> hmf,
+        HandlerManagerMiddleware<TIn, TOut> middleware) => provider =>
     {
-        var handler = hf(provider);
+        var handler = hmf(provider);
         return middleware(handler);
     };
 
-    public static HandlerFactory<T> Touch<T>(this HandlerFactory<T> hf,
-        HandlerMiddleware<T, T> middleware) => hf.Map(middleware);
+    public static HandlerManagerFactory<T> Touch<T>(this HandlerManagerFactory<T> hf,
+        HandlerManagerMiddleware<T, T> middleware) => hf.Map(middleware);
 
-    public static HandlerFactory<T> Dispose<T>(this HandlerFactory<T> hf) where T : IDisposable =>
-        hf.Touch(next => async (context, ct) =>
-        {
-            try
-            {
-                await next(context, ct).ConfigureAwait(false);
-            }
-            finally
-            {
-                context.Dispose();
-            }
-        });
+    public static HandlerManagerFactory<TIn> MapHandler<TIn, TOut>(this HandlerManagerFactory<TOut> hmf,
+        HandlerMiddleware<TIn, TOut> middleware) =>
+        hmf.Map<TIn, TOut>(next => next.Map(middleware));
 
-    public static HandlerFactory<T> DisposeAsync<T>(this HandlerFactory<T> hf) where T : IAsyncDisposable =>
-        hf.Touch(next => async (context, ct) =>
-        {
-            try
-            {
-                await next(context, ct).ConfigureAwait(false);
-            }
-            finally
-            {
-                await context.DisposeAsync().ConfigureAwait(false);
-            }
-        });
-
-    public static HandlerFactory<T> SkipWhen<T>(this HandlerFactory<T> hf, Func<T, bool> pred) =>
-        hf.Touch(next => async (context, ct) =>
-        {
-            if (pred(context))
-                return;
-
-            await next(context, ct).ConfigureAwait(false);
-        });
+    public static HandlerManagerFactory<T> TouchHandler<T>(this HandlerManagerFactory<T> hmf,
+        HandlerMiddleware<T, T> middleware) => hmf.MapHandler(middleware);
 }

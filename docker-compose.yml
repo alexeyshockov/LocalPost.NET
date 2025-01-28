@@ -8,6 +8,19 @@ volumes:
   localstack:
     driver: local
 services:
+  # https://learn.microsoft.com/en-us/dotnet/aspire/fundamentals/dashboard/standalone
+  # https://hub.docker.com/r/microsoft/dotnet-aspire-dashboard
+  aspire:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.0
+    ports:
+      - "18888:18888" # HTTP
+      - "18889:18889" # OTEL collector GRPC
+      - "18890:18890" # OTEL collector HTTP
+    environment:
+      - DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true
+#      - Dashboard__Otlp__AuthMode=Unsecured
+      # This setting is a shortcut to configuring Dashboard:Frontend:AuthMode and Dashboard:Otlp:AuthMode to Unsecured
+      - ASPIRE_ALLOW_UNSECURED_TRANSPORT=true
   localstack:
     # https://docs.localstack.cloud/getting-started/installation/#docker-compose
     image: localstack/localstack:4

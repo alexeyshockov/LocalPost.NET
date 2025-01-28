@@ -1,6 +1,7 @@
 using Amazon.Extensions.NETCore.Setup;
 using Amazon.Runtime;
 using Amazon.SQS;
+using LocalPost.Flow;
 using LocalPost.SqsConsumer.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -70,6 +71,48 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
 
         received.Should().HaveCount(1);
         received[0].Should().Be("It will rainy in London tomorrow");
+
+        await host.StopAsync();
+    }
+
+    [Fact]
+    public async Task handles_batches()
+    {
+        var hostBuilder = Host.CreateApplicationBuilder();
+
+        var received = new List<IReadOnlyCollection<string>>();
+
+        hostBuilder.Services
+            .AddDefaultAWSOptions(new AWSOptions()
+            {
+                DefaultClientConfig = { ServiceURL = _container.GetConnectionString() },
+                Credentials = _credentials,
+            })
+            .AddAWSService<IAmazonSQS>()
+            .AddSqsConsumers(sqs => sqs.AddConsumer(QueueName,
+                HandlerStack.For<IReadOnlyCollection<string>>(payload => received.Add(payload))
+                    .Scoped()
+                    .UseSqsPayload()
+                    .Trace()
+                    .LogExceptions()
+                    .Acknowledge() // Will acknowledge in any case, as we already caught all the exceptions before
+                    .Batch(10, TimeSpan.FromSeconds(1))
+            ));
+
+        var host = hostBuilder.Build();
+
+        await host.StartAsync();
+
+        var sqs = CreateClient();
+        await sqs.SendMessageAsync(_queueUrl, "It will be rainy in London tomorrow");
+        await sqs.SendMessageAsync(_queueUrl, "It will be sunny in Paris tomorrow");
+
+        await Task.Delay(3_000); // "App is working"
+
+        received.Should().HaveCount(1);
+        received[0].Should().BeEquivalentTo(
+            "It will be rainy in London tomorrow",
+            "It will be sunny in Paris tomorrow");
 
         await host.StopAsync();
     }
