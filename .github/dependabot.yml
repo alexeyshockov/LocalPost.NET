@@ -3,21 +3,4 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: weekly
-  - package-ecosystem: nuget
-    directory: "/"
-    groups:
-      xunit:
-        patterns:
-          - xunit*
-    schedule:
-      interval: weekly
-    ignore:
-      # Ignore the libraries which are pinned
-      - dependency-name: "Microsoft.Bcl.AsyncInterfaces"
-      - dependency-name: "Microsoft.Extensions.Logging"
-      - dependency-name: "Microsoft.Extensions.Logging.Abstractions"
-      - dependency-name: "Microsoft.Extensions.Hosting.Abstractions"
-      - dependency-name: "Microsoft.Extensions.Options"
-      - dependency-name: "System.Diagnostics.DiagnosticSource"
-      - dependency-name: "System.Threading.Channels"
+      interval: monthly

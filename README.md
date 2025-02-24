@@ -1,5 +1,8 @@
 # LocalPost
 
+[![NuGet package](https://img.shields.io/nuget/dt/LocalPost)](https://www.nuget.org/packages/LocalPost/)
+[![Code coverage](https://img.shields.io/sonar/coverage/alexeyshockov_LocalPost.NET?server=https%3A%2F%2Fsonarcloud.io)](https://sonarcloud.io/project/overview?id=alexeyshockov_LocalPost.NET)
+
 Simple .NET in-memory background queue ([System.Threading.Channels](https://learn.microsoft.com/de-de/dotnet/api/system.threading.channels?view=net-6.0) based).
 
 ## Background tasks

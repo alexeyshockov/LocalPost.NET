@@ -89,10 +89,11 @@ internal static class KafkaActivityExtensions
     //     activity?.SetTag("messaging.batch.message_count", batch.Count);
 }
 
-// Npgsql as an inspiration:
-//  - https://github.com/npgsql/npgsql/blob/main/src/Npgsql/NpgsqlActivitySource.cs#LL61C31-L61C49
-//  - https://github.com/npgsql/npgsql/blob/main/src/Npgsql/NpgsqlCommand.cs#L1639-L1644
-// Also OTEL semantic convention: https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/
+// Based on Semantic Conventions 1.30.0, see
+// https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/
+// Also Npgsql as an inspiration:
+//  - https://github.com/npgsql/npgsql/blob/main/src/Npgsql/NpgsqlActivitySource.cs
+//  - https://github.com/npgsql/npgsql/blob/main/src/Npgsql/NpgsqlCommand.cs
 internal static class Tracing
 {
     private static readonly ActivitySource Source;
@@ -109,31 +110,27 @@ internal static class Tracing
     public static Activity? StartProcessing<T>(IReadOnlyCollection<ConsumeContext<T>> batch)
     {
         Debug.Assert(batch.Count > 0);
-        var activity = Source.CreateActivity($"{batch.First().Topic} process", ActivityKind.Consumer);
-        if (activity is { IsAllDataRequested: true })
-        {
-            activity.SetTag("messaging.operation.type", "process");
-            activity.SetDefaultTags(batch.First().Client);
-            activity.SetTagsFor(batch);
-        }
+        var activity = Source.StartActivity($"process {batch.First().Topic}", ActivityKind.Consumer);
+        if (activity is not { IsAllDataRequested: true })
+            return activity;
 
-        activity?.Start();
+        activity.SetTag("messaging.operation.type", "process");
+        activity.SetDefaultTags(batch.First().Client);
+        activity.SetTagsFor(batch);
 
         return activity;
     }
 
     public static Activity? StartProcessing<T>(ConsumeContext<T> context)
     {
-        var activity = Source.CreateActivity($"{context.Topic} process", ActivityKind.Consumer);
-        if (activity is { IsAllDataRequested: true })
-        {
-            activity.SetTag("messaging.operation.type", "process");
-            activity.SetDefaultTags(context.Client);
-            activity.SetTagsFor(context);
-            activity.AcceptDistributedTracingFrom(context.Message);
-        }
+        var activity = Source.StartActivity($"process {context.Topic}", ActivityKind.Consumer);
+        if (activity is not { IsAllDataRequested: true })
+            return activity;
 
-        activity?.Start();
+        activity.SetTag("messaging.operation.type", "process");
+        activity.SetDefaultTags(context.Client);
+        activity.SetTagsFor(context);
+        activity.AcceptDistributedTracingFrom(context.Message);
 
         return activity;
     }

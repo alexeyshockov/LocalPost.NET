@@ -63,10 +63,11 @@ internal static class SqsActivityExtensions
         activity?.SetTag("messaging.batch.message_count", response.Messages.Count);
 }
 
-// Npgsql as an inspiration:
-//  - https://github.com/npgsql/npgsql/blob/main/src/Npgsql/NpgsqlActivitySource.cs#LL61C31-L61C49
-//  - https://github.com/npgsql/npgsql/blob/main/src/Npgsql/NpgsqlCommand.cs#L1639-L1644
-// Also OTEL semantic convention: https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/
+// Based on Semantic Conventions 1.30.0, see
+// https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/
+// Also Npgsql as an inspiration:
+//  - https://github.com/npgsql/npgsql/blob/main/src/Npgsql/NpgsqlActivitySource.cs
+//  - https://github.com/npgsql/npgsql/blob/main/src/Npgsql/NpgsqlCommand.cs
 internal static class Tracing
 {
     private static readonly ActivitySource Source;
@@ -84,7 +85,7 @@ internal static class Tracing
     {
         Debug.Assert(batch.Count > 0);
         var client = batch.First().Client;
-        var activity = Source.CreateActivity($"{client.QueueName} process", ActivityKind.Consumer);
+        var activity = Source.StartActivity($"process {client.QueueName}", ActivityKind.Consumer);
         if (activity is { IsAllDataRequested: true })
         {
             activity?.SetTag("messaging.operation.type", "process");
@@ -100,7 +101,7 @@ internal static class Tracing
 
     public static Activity? StartProcessing<T>(ConsumeContext<T> context)
     {
-        var activity = Source.CreateActivity($"{context.Client.QueueName} process", ActivityKind.Consumer);
+        var activity = Source.StartActivity($"process {context.Client.QueueName}", ActivityKind.Consumer);
         if (activity is { IsAllDataRequested: true })
         {
             activity.SetTag("messaging.operation.type", "process");
@@ -116,7 +117,7 @@ internal static class Tracing
 
     public static Activity? StartSettling<T>(ConsumeContext<T> context)
     {
-        var activity = Source.StartActivity($"{context.Client.QueueName} settle", ActivityKind.Consumer);
+        var activity = Source.StartActivity($"settle {context.Client.QueueName}", ActivityKind.Consumer);
         if (activity is not { IsAllDataRequested: true })
             return activity;
 
@@ -129,7 +130,7 @@ internal static class Tracing
 
     public static Activity? StartReceiving(QueueClient client)
     {
-        var activity = Source.StartActivity($"{client.QueueName} receive", ActivityKind.Consumer);
+        var activity = Source.StartActivity($"receive {client.QueueName}", ActivityKind.Consumer);
         if (activity is not { IsAllDataRequested: true })
             return activity;
 
