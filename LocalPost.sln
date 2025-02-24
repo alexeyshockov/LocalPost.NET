@@ -2,7 +2,7 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost", "src\LocalPost\LocalPost.csproj", "{474D2C1A-5557-4ED9-AF20-FE195D4C1AF7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BackgroundQueueApp", "samples\BackgroundQueueApp\BackgroundQueueApp.csproj", "{46FC61E6-D0FB-4D7D-A81B-20EF8D8D1F4E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BackgroundQueueApp", "examples\BackgroundQueueApp\BackgroundQueueApp.csproj", "{46FC61E6-D0FB-4D7D-A81B-20EF8D8D1F4E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost.Tests", "tests\LocalPost.Tests\LocalPost.Tests.csproj", "{0E69A423-5F70-4BA7-8015-0AB0BC4B6FD2}"
 EndProject
@@ -14,9 +14,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost.KafkaConsumer", "
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Examples", "Examples", "{405721DC-F290-4191-B638-9907D5EB042B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KafkaConsumerApp", "samples\KafkaConsumerApp\KafkaConsumerApp.csproj", "{C310487A-B976-4D3E-80AF-4ADBE1C63139}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KafkaConsumerApp", "examples\KafkaConsumerApp\KafkaConsumerApp.csproj", "{C310487A-B976-4D3E-80AF-4ADBE1C63139}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SqsConsumerApp", "samples\SqsConsumerApp\SqsConsumerApp.csproj", "{2778AEBD-0345-4F79-9E93-73AFAB6C7BCD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SqsConsumerApp", "examples\SqsConsumerApp\SqsConsumerApp.csproj", "{2778AEBD-0345-4F79-9E93-73AFAB6C7BCD}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalPost.KafkaConsumer.Tests", "tests\LocalPost.KafkaConsumer.Tests\LocalPost.KafkaConsumer.Tests.csproj", "{734C9C76-B3D8-4AD7-8E76-B14539C3CB4D}"
 EndProject
