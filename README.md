@@ -19,9 +19,10 @@ For the core library:
 dotnet add package LocalPost
 ```
 
-AWS SQS, Kafka and other integrations are provided as separate packages:
+AWS SQS, Kafka and other integrations are provided as separate packages, like:
 
 ```shell
+dotnet add package LocalPost.SqsConsumer
 dotnet add package LocalPost.KafkaConsumer
 ```
 
@@ -49,4 +50,4 @@ Service bus (for bigger solutions):
 
 ## Inspiration
 
-- [FastStream](https://github.com/airtai/faststream) — Python framework with similar goals
+- [FastStream](https://github.com/airtai/faststream)
