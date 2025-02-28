@@ -3,6 +3,7 @@ using Confluent.Kafka;
 
 namespace LocalPost.KafkaConsumer;
 
+[UsedImplicitly]
 public sealed record ConsumerOptions
 {
     public ConsumerConfig ClientConfig { get; set; } = new();
