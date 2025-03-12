@@ -7,13 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
 ### Added
 
 ### Changed
 
 ### Removed
 
-## [0.2.0] - 2025-02-28
+## [0.2.0] - 2025-03-12
 
 ### Changed
 
@@ -21,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- LocalPost.SnsPublisher
+- LocalPost.SnsPublisher package
 
 ## [0.1.0] - 2023-01-01
 
