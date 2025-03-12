@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 
-# Print a command before actually executing it
-set -x
-# Break the script if one of the command fails (returns non-zero status code)
-set -e
+set -o xtrace,errexit
 
 # $SONAR_TOKEN must be defined
 # $GitVersion_FullSemVer can be used to specify the current version (see GitVersion)
@@ -15,9 +12,10 @@ fi
 
 dotnet build-server shutdown
 dotnet sonarscanner begin \
-    /d:sonar.host.url="https://sonarcloud.io" /d:sonar.login="$SONAR_TOKEN" \
-    /o:"alexeyshockov" /k:"alexeyshockov_LocalPost" $VERSION \
+    /d:sonar.host.url="https://sonarcloud.io" /d:sonar.token="$SONAR_TOKEN" \
+    /o:"alexeyshockov" /k:"alexeyshockov_LocalPost.NET" "$VERSION" \
     /d:sonar.dotnet.excludeTestProjects=true \
+    /d:sonar.coverage.exclusions="**/examples/**" \
     /d:sonar.cs.opencover.reportsPaths="tests/*/TestResults/*/coverage.opencover.xml" \
     /d:sonar.cs.vstest.reportsPaths="tests/*/TestResults/*.trx"
 
@@ -25,4 +23,4 @@ dotnet sonarscanner begin \
 dotnet build
 dotnet test --no-build --collect:"XPlat Code Coverage" --settings coverlet.runsettings --logger=trx
 
-dotnet sonarscanner end /d:sonar.login="$SONAR_TOKEN"
+dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"

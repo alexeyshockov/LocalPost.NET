@@ -8,8 +8,11 @@ root = true
 [*]
 indent_style = space
 
+[*.sln]
+indent_style = tab
+
 # Code files
-[*.{cs,csx,vb,vbx}]
+[*.{cs,csx,vb,vbx,fs,fsx,fsi}]
 indent_size = 4
 max_line_length = 120
 insert_final_newline = true
@@ -33,3 +36,17 @@ indent_size = 4
 [*.md]
 trim_trailing_whitespace = true
 insert_final_newline = true
+
+# See https://github.com/dotnet/aspnetcore/blob/main/.editorconfig
+[src/**/*.{cs,csx,vb,vbx,fs,fsx,fsi}]
+
+# See https://www.jetbrains.com/help/resharper/ConfigureAwait_Analysis.html
+configure_await_analysis_mode = library
+# CA2007: Consider calling ConfigureAwait on the awaited task
+#dotnet_diagnostic.CA2007.severity = warning
+
+# CA2012: Use ValueTask correctly
+dotnet_diagnostic.CA2012.severity = warning
+
+# CA2013: Do not use ReferenceEquals with value types
+dotnet_diagnostic.CA2013.severity = warning

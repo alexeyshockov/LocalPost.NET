@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>net6;net8</TargetFrameworks>
+
+        <PackageId>LocalPost.KafkaConsumer</PackageId>
+
+        <Description>Opinionated Kafka consumer library, build to be simple, but yet flexible.</Description>
+        <PackageTags>background;task;queue;kafka</PackageTags>
+        <!-- See https://devblogs.microsoft.com/nuget/add-a-readme-to-your-nuget-package/ -->
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="" />
+        <None Include="..\..\LICENSE" Pack="true" PackagePath="" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Confluent.Kafka" Version="[2.4.0,3.0.0)" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="JetBrains.Annotations" Version="2024.3.0" PrivateAssets="All" />
+        <PackageReference Include="PolySharp" Version="1.15.*" PrivateAssets="All" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.*" PrivateAssets="All" />
+        <PackageReference Include="GitVersion.MsBuild" Version="6.*" PrivateAssets="All" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\LocalPost\LocalPost.csproj" />
+    </ItemGroup>
+
+</Project>

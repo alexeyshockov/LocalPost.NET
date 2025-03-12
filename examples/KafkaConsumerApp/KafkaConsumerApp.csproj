@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+    <PropertyGroup>
+        <TargetFramework>net8</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Confluent.Kafka" Version="2.*" />
+        <PackageReference Include="Confluent.SchemaRegistry" Version="2.*" />
+        <PackageReference Include="Confluent.SchemaRegistry.Serdes.Protobuf" Version="2.*" />
+        <!-- protoc compiler -->
+        <PackageReference Include="Grpc.Tools" Version="2.*" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.*" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\LocalPost\LocalPost.csproj" />
+        <ProjectReference Include="..\..\src\LocalPost.KafkaConsumer\LocalPost.KafkaConsumer.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Content Update="appsettings.json" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" />
+        <Content Update="appsettings.*.json" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always">
+            <DependentUpon>appsettings.json</DependentUpon>
+        </Content>
+    </ItemGroup>
+
+</Project>

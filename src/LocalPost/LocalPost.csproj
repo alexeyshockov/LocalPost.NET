@@ -1,23 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>netstandard2.0</TargetFramework>
+        <TargetFrameworks>net6;net8</TargetFrameworks>
 
         <AssemblyName>LocalPost</AssemblyName>
-        <IsPackable>true</IsPackable>
-        <!-- See https://docs.microsoft.com/en-us/nuget/create-packages/creating-a-package-dotnet-cli -->
-        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-
         <PackageId>LocalPost</PackageId>
-        <PackageTags>background;task;queue;coravel;hangfire</PackageTags>
+        
         <Description>Local (in-process) background queue.</Description>
-        <Authors>Alexey Shokov</Authors>
+        <PackageTags>background;task;queue;coravel;hangfire</PackageTags>
         <!-- See https://devblogs.microsoft.com/nuget/add-a-readme-to-your-nuget-package/ -->
         <PackageReadmeFile>README.md</PackageReadmeFile>
-        <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <RepositoryUrl>https://github.com/alexeyshockov/LocalPost</RepositoryUrl>
-        <RepositoryType>git</RepositoryType>
-        <PublishRepositoryUrl>true</PublishRepositoryUrl>
     </PropertyGroup>
 
     <ItemGroup>
@@ -25,42 +17,42 @@
         <None Include="..\..\LICENSE" Pack="true" PackagePath="" />
     </ItemGroup>
 
-    <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
-        <!-- See https://devblogs.microsoft.com/dotnet/producing-packages-with-source-link/#deterministic-builds -->
-        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-    </PropertyGroup>
+    <ItemGroup>
+        <!-- DependencyInjection 8+ is required for KeyedServices -->
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="8.0.0" />
+        <!-- For IHealthChecksBuilder -->
+        <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="8.0.0" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <PackageReference Include="Polly.Core" Version="8.2.0" />
+<!--        <PackageReference Include="Polly.Extensions" Version="8.2.0" />-->
+    </ItemGroup>
 
-    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-        <EmbedAllSources>true</EmbedAllSources>
-        <EmbedUntrackedSources>true</EmbedUntrackedSources>
-        <IncludeSymbols>true</IncludeSymbols>
-        <IncludeSource>true</IncludeSource>
-        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-
-        <!-- See https://blog.paranoidcoding.com/2016/04/05/deterministic-builds-in-roslyn.html -->
-        <Deterministic>true</Deterministic>
-    </PropertyGroup>
+    <ItemGroup Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">
+        <PackageReference Include="System.Collections.Immutable" Version="8.0.0" />
+        <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
+        <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="8.0.0" />
+    </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="6.0.0" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.0" />
-        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
-        <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="6.0.0" />
-        <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="6.0.0" />
-        <PackageReference Include="Nito.AsyncEx.Tasks" Version="5.1.2" />
-        <PackageReference Include="System.Collections.Immutable" Version="6.0.0" />
-        <PackageReference Include="System.Threading.Channels" Version="6.0.0" />
-
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.*" PrivateAssets="All" />
-        <PackageReference Include="GitVersion.MsBuild" Version="5.*" PrivateAssets="All" />
+        <PackageReference Include="JetBrains.Annotations" Version="2024.3.0" PrivateAssets="All" />
+        <PackageReference Include="PolySharp" Version="1.15.*" PrivateAssets="All" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.*" PrivateAssets="All" />
+        <PackageReference Include="GitVersion.MsBuild" Version="6.*" PrivateAssets="All" />
     </ItemGroup>
 
     <ItemGroup>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-            <_Parameter1>$(MSBuildProjectName).SnsPublisher</_Parameter1>
+            <_Parameter1>$(MSBuildProjectName).SqsConsumer</_Parameter1>
         </AssemblyAttribute>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-            <_Parameter1>$(MSBuildProjectName).SqsConsumer</_Parameter1>
+            <_Parameter1>$(MSBuildProjectName).KafkaConsumer</_Parameter1>
         </AssemblyAttribute>
     </ItemGroup>
 

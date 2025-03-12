@@ -1,37 +1,22 @@
 using System.Threading.Channels;
+using LocalPost.BackgroundQueue;
 
 namespace LocalPost;
 
-public interface IBackgroundQueue<in T>
+/// <summary>
+///     Background queue publisher.
+/// </summary>
+/// <typeparam name="T">Payload type.</typeparam>
+public interface IBackgroundQueue<T>
 {
-    ValueTask Enqueue(T item, CancellationToken ct = default);
+    ValueTask Enqueue(T payload, CancellationToken ct = default);
+
+    ChannelWriter<ConsumeContext<T>> Writer { get; }
 }
 
-public interface IBackgroundQueueReader<TOut>
-{
-    public ChannelReader<TOut> Reader { get; }
-}
+public delegate Task BackgroundJob(CancellationToken ct);
 
-public interface IMessageHandler<in TOut>
-{
-    Task Process(TOut payload, CancellationToken ct);
-}
-
-public delegate Task MessageHandler<in T>(T context, CancellationToken ct);
-
-
-
-// Simplest background queue
-public sealed class BackgroundQueue<T> : IBackgroundQueue<T>, IAsyncEnumerable<T>
-{
-    private readonly Channel<T> _messages = Channel.CreateUnbounded<T>(new UnboundedChannelOptions
-    {
-        SingleReader = false,
-        SingleWriter = false,
-    });
-
-    public ValueTask Enqueue(T item, CancellationToken ct = default) => _messages.Writer.WriteAsync(item, ct);
-
-    public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken ct = default) =>
-        _messages.Reader.ReadAllAsync(ct).GetAsyncEnumerator(ct);
-}
+/// <summary>
+///     Just a convenient alias for <see cref="IBackgroundQueue{BackgroundJob}" /> queue.
+/// </summary>
+public interface IBackgroundJobQueue : IBackgroundQueue<BackgroundJob>;

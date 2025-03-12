@@ -1,11 +1,15 @@
-﻿using System.Diagnostics.CodeAnalysis;
-
-namespace LocalPost;
+﻿namespace LocalPost;
 
 [ExcludeFromCodeCoverage]
 internal static class Reflection
 {
+    // public static string FriendlyNameOf<T>(string name) where T : INamedService =>
+    public static string FriendlyNameOf<T>(string? name) => FriendlyNameOf(typeof(T), name);
+
     public static string FriendlyNameOf<T>() => FriendlyNameOf(typeof(T));
+
+    public static string FriendlyNameOf(Type type, string? name) =>
+        FriendlyNameOf(type) + (string.IsNullOrEmpty(name) ? "" : $" (\"{name}\")");
 
     public static string FriendlyNameOf(Type type) => type.IsGenericType switch
     {

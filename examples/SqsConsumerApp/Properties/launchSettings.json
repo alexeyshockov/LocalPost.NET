@@ -1,0 +1,16 @@
+﻿{
+  "profiles": {
+    "SqsConsumerApp": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "AWS_ACCESS_KEY_ID": "test",
+        "AWS_SECRET_ACCESS_KEY": "test",
+        "OTEL_SERVICE_NAME": "SampleSqsConsumer",
+        "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+        "OTEL_EXPORTER_OTLP_ENDPOINT": "http://127.0.0.1:18889"
+      }
+    }
+  }
+}
