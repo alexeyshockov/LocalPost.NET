@@ -4,7 +4,7 @@
 
 ### Local infrastructure
 
-`docker compose up -d` to spin up the localstack & Aspire containers
+`docker compose up -d` to spin up the localstack & Aspire containers.
 
 ### SQS queue
 

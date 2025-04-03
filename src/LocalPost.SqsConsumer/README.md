@@ -1,5 +1,7 @@
 # LocalPost Amazon SQS Consumer
 
+[![NuGet package](https://img.shields.io/nuget/dt/LocalPost.SqsConsumer)](https://www.nuget.org/packages/LocalPost.SqsConsumer/)
+
 ## IAM Permissions
 
 Only `sqs:ReceiveMessage` is required to run a queue consumer. To use additional features also require:

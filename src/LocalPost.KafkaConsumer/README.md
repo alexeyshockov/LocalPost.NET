@@ -1,5 +1,7 @@
 # LocalPost Kafka Consumer
 
+[![NuGet package](https://img.shields.io/nuget/dt/LocalPost.KafkaConsumer)](https://www.nuget.org/packages/LocalPost.KafkaConsumer/)
+
 ## librdkafka's background prefetching
 
 The Kafka client automatically prefetches messages in the background. This is done by the background thread that is
