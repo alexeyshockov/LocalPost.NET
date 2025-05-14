@@ -17,13 +17,14 @@ jobs:
         with:
           # Full history is needed to get a proper list of changed files
           fetch-depth: 0
-      - uses: github/super-linter@v7
+#      - uses: github/super-linter@v7
+      - uses: super-linter/super-linter/slim@v7
         env:
           DEFAULT_BRANCH: main
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VALIDATE_ALL_CODEBASE: false # Only changed files
           VALIDATE_EDITORCONFIG: true
-          VALIDATE_CSHARP: false # Checked by SonarQube
+#          VALIDATE_CSHARP: false # Checked by SonarQube
           VALIDATE_JSON: true
           VALIDATE_MARKDOWN: true
           VALIDATE_YAML: true
