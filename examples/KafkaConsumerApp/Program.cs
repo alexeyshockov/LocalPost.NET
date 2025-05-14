@@ -13,31 +13,29 @@ builder.Services.Configure<HostOptions>(options =>
     options.ServicesStopConcurrently = true;
 });
 
-builder.Services
+var kafka = builder.Services
     .AddScoped<MessageHandler>()
-    .AddKafkaConsumers(kafka =>
+    .AddKafkaConsumers();
+kafka.Defaults
+    .Bind(builder.Configuration.GetSection("Kafka"))
+    .ValidateDataAnnotations();
+kafka.AddConsumer("example-consumer-group",
+        HandlerStack.From<MessageHandler, WeatherForecast>()
+            .Scoped()
+            .UseKafkaPayload()
+            .Deserialize(context => JsonSerializer.Deserialize<WeatherForecast>(context.Payload)!)
+            .Trace()
+            // .Acknowledge()
+            .LogExceptions()
+    )
+    .Bind(builder.Configuration.GetSection("Kafka:Consumer"))
+    .Configure(options =>
     {
-        kafka.Defaults
-            .Bind(builder.Configuration.GetSection("Kafka"))
-            .ValidateDataAnnotations();
-        kafka.AddConsumer("example-consumer-group",
-                HandlerStack.From<MessageHandler, WeatherForecast>()
-                    .Scoped()
-                    .UseKafkaPayload()
-                    .Deserialize(context => JsonSerializer.Deserialize<WeatherForecast>(context.Payload)!)
-                    .Trace()
-                    // .Acknowledge()
-                    .LogExceptions()
-            )
-            .Bind(builder.Configuration.GetSection("Kafka:Consumer"))
-            .Configure(options =>
-            {
-                options.ClientConfig.AutoOffsetReset = AutoOffsetReset.Earliest;
-                // options.ClientConfig.EnableAutoCommit = false; // DryRun
-                // options.ClientConfig.EnableAutoOffsetStore = false; // Manually acknowledge every message
-            })
-            .ValidateDataAnnotations();
-    });
+        options.ClientConfig.AutoOffsetReset = AutoOffsetReset.Earliest;
+        // options.ClientConfig.EnableAutoCommit = false; // DryRun
+        // options.ClientConfig.EnableAutoOffsetStore = false; // Manually acknowledge every message
+    })
+    .ValidateDataAnnotations();
 
 await builder.Build().RunAsync();
 

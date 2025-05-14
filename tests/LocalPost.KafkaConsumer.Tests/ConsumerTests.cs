@@ -47,7 +47,8 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
         var received = new List<string>();
 
         var hostBuilder = Host.CreateApplicationBuilder();
-        hostBuilder.Services.AddKafkaConsumers(kafka => kafka
+        var kafka = hostBuilder.Services.AddKafkaConsumers();
+        kafka
             .AddConsumer("test-consumer",
                 HandlerStack.For<string>(payload => received.Add(payload))
                     .Scoped()
@@ -66,7 +67,7 @@ public class ConsumerTests(ITestOutputHelper output) : IAsyncLifetime
                 // Otherwise the client attaches to the end of the topic, skipping all the published messages
                 co.ClientConfig.AutoOffsetReset = AutoOffsetReset.Earliest;
             })
-            .ValidateDataAnnotations());
+            .ValidateDataAnnotations();
 
         var host = hostBuilder.Build();
 

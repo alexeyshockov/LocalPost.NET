@@ -8,6 +8,8 @@ using Polly.Retry;
 
 var builder = WebApplication.CreateBuilder(args);
 
+#region Background queues setup
+
 // See https://github.com/App-vNext/Polly/blob/main/docs/migration-v8.md
 var resiliencePipeline = new ResiliencePipelineBuilder()
     .AddRetry(new RetryStrategyOptions
@@ -21,19 +23,19 @@ var resiliencePipeline = new ResiliencePipelineBuilder()
     .Build();
 
 // A background queue with an inline handler
-builder.Services.AddBackgroundQueues(bq =>
-    bq.AddQueue(HandlerStack.For<WeatherForecast>(async (weather, ct) =>
-        {
-            await Task.Delay(TimeSpan.FromSeconds(2), ct);
-            Console.WriteLine(weather.Summary);
-        })
-        .UseMessagePayload()
-        .Scoped()
-        .Trace()
-        .UsePollyPipeline(resiliencePipeline)
-        .LogExceptions()
-    )
-);
+var bq = builder.Services.AddBackgroundQueues();
+bq.AddQueue(HandlerStack.For<WeatherForecast>(async (weather, ct) =>
+    {
+        await Task.Delay(TimeSpan.FromSeconds(2), ct);
+        Console.WriteLine(weather.Summary);
+    })
+    .UseMessagePayload()
+    .Scoped()
+    .Trace()
+    .UsePollyPipeline(resiliencePipeline)
+    .LogExceptions());
+
+#endregion
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

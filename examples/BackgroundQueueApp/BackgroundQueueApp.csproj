@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
     <PropertyGroup>
-        <TargetFramework>net8</TargetFramework>
+        <TargetFramework>net9</TargetFramework>
     </PropertyGroup>
 
     <ItemGroup>
@@ -9,7 +9,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="7.*" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="8.*" />
     </ItemGroup>
 
     <ItemGroup>

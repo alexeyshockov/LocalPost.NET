@@ -6,6 +6,8 @@
 
 `docker compose up -d` to spin up the localstack & Aspire containers.
 
+And access Aspire at [http://localhost:18888](http://localhost:18888).
+
 ### SQS queue
 
 ```shell

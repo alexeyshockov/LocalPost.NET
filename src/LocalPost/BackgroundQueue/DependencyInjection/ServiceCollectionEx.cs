@@ -5,11 +5,5 @@ namespace LocalPost.BackgroundQueue.DependencyInjection;
 [PublicAPI]
 public static class ServiceCollectionEx
 {
-    public static IServiceCollection AddBackgroundQueues(this IServiceCollection services,
-        Action<BackgroundQueuesBuilder> configure)
-    {
-        configure(new BackgroundQueuesBuilder(services));
-
-        return services;
-    }
+    public static BackgroundQueuesBuilder AddBackgroundQueues(this IServiceCollection services) => new(services);
 }

@@ -11,16 +11,17 @@ using Serilog.Sinks.FingersCrossed;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+#region Generic configuration
+
 builder.Services
     .AddSerilog() // See https://nblumhardt.com/2024/04/serilog-net8-0-minimal/#hooking-up-aspnet-core-and-iloggert
-    .AddDefaultAWSOptions(builder.Configuration.GetAWSOptions())
-    .AddAWSService<IAmazonSQS>();
+    .Configure<HostOptions>(options =>
+    {
+        options.ServicesStartConcurrently = true;
+        options.ServicesStopConcurrently = true;
+    });
 
-builder.Services.Configure<HostOptions>(options =>
-{
-    options.ServicesStartConcurrently = true;
-    options.ServicesStopConcurrently = true;
-});
+#endregion
 
 #region OpenTelemetry
 
@@ -44,22 +45,26 @@ builder.Services.AddOpenTelemetry()
 
 #endregion
 
+#region SQS consumers setup
+
 builder.Services
-    .AddScoped<MessageHandler>()
-    .AddSqsConsumers(sqs =>
-    {
-        sqs.Defaults.Configure(options => options.MaxNumberOfMessages = 1);
-        sqs.AddConsumer("weather-forecasts", // Also acts as a queue name
-            HandlerStack.From<MessageHandler, WeatherForecast>()
-                .Scoped()
-                .UseSqsPayload()
-                .DeserializeJson()
-                .Trace()
-                .Acknowledge() // Do not include DeleteMessage call in the OpenTelemetry root span (transaction)
-                .LogFingersCrossed()
-                .LogExceptions()
-        );
-    });
+    .AddDefaultAWSOptions(builder.Configuration.GetAWSOptions())
+    .AddAWSService<IAmazonSQS>()
+    .AddScoped<MessageHandler>();
+var sqs = builder.Services.AddSqsConsumers();
+sqs.Defaults.Configure(options => options.MaxNumberOfMessages = 1);
+sqs.AddConsumer("weather-forecasts", // Also acts as a queue name
+    HandlerStack.From<MessageHandler, WeatherForecast>()
+        .Scoped()
+        .UseSqsPayload()
+        .DeserializeJson()
+        .Trace()
+        .Acknowledge() // Do not include DeleteMessage call in the OpenTelemetry root span (transaction)
+        .LogFingersCrossed()
+        .LogExceptions()
+);
+
+#endregion
 
 await builder.Build().RunAsync();
 
